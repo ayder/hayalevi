@@ -88,6 +88,7 @@ bool fBootDbase;
 void init_mm(void);
 void load_helps(void);
 void load_config(void);
+void load_feelings(void);
 void memory_other(USER_DATA *usr);
 bool write_to_desc(int desc, char *txt, int length);
 
@@ -130,6 +131,8 @@ void boot_dbase(void) {
 		load_banishes();
 		log_string("Load_validates: Loading validate data");
 		load_validates();
+		log_string("Load_Feelings: Loading feelings");
+		load_feelings();
 	}
 
 	return;
@@ -151,7 +154,7 @@ HELP_DATA *read_help(FILE *fpHelp) {
 		letter = getc(fpHelp);
 		if (feof(fpHelp)) {
 			fclose(fpHelp);
-			fpReserve = fopen(NULL_FILE, "r");
+			//fpReserve = fopen(NULL_FILE, "r");
 			return NULL;
 		}
 	} while (isspace(letter));
@@ -218,10 +221,10 @@ void load_helps(void) {
 
 	log_string("Load_helps: Loading help file");
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	if (!(fpHelp = fopen(HELP_FILE, "r"))) {
 		bbs_bug("Load_helps: Could not open to read %s", HELP_FILE);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
@@ -245,6 +248,87 @@ void load_helps(void) {
 	}
 
 	log_string("Load_helps: Done");
+	return;
+}
+
+FEELING_DATA* first_feeling;
+FEELING_DATA* last_feeling;
+
+FEELING_DATA* read_feeling(FILE* fpFeel) {
+	FEELING_DATA* pFeel;
+	char* word = '\0';
+	char letter;
+	bool fMatch = FALSE;
+
+	do {
+		letter = getc(fpFeel);
+		if (feof(fpFeel)) {
+			fclose(fpFeel);
+			//fpReserve = fopen(NULL_FILE, "r");
+			return NULL;
+		}
+	} while (isspace(letter));
+	ungetc(letter, fpFeel);
+
+	pFeel = (FEELING_DATA*) alloc_mem(sizeof(FEELING_DATA));
+	pFeel->keyword = NULL;
+	pFeel->text = NULL;
+	pFeel->name = NULL;
+
+	for (;;) {
+		word = feof(fpFeel) ? "End" : fread_word(fpFeel);
+		fMatch = FALSE;
+
+		switch(UPPER(word[0])) {
+			case 'E':
+				if (!str_cmp(word, "End")) {
+					pFeel->next = NULL;
+					pFeel->prev = NULL;
+					return pFeel;
+				}
+				break;
+
+			case 'K':
+				KEYS("Keyword", pFeel->keyword, fread_string(fpFeel));
+				break;
+
+			case 'N':
+				KEY("Name", pFeel->name, fread_string(fpFeel));
+				break;
+
+			case 'T':
+				KEYS("Text", pFeel->text, fread_string(fpFeel));
+				break;
+		}
+
+		if (!fMatch) {
+			bbs_bug("Read_Feeling: Unknown key '%s'", word);
+			return NULL;
+		}
+	}
+
+	return pFeel;
+}
+
+void load_feelings(void) {
+	FEELING_DATA* pFeel;
+	FILE* fpFeel;
+
+	first_feeling = NULL;
+	last_feeling = NULL;
+
+	//fclose(fpReserve);
+	if (!(fpFeel = fopen(FEELING_FILE, "r"))) {
+		bbs_bug("Load_feelings: Cannot open %s", FEELING_FILE);
+		//fpReserve = fopen(NULL_FILE, "r");
+		return;
+	}
+
+	while ((pFeel = read_feeling(fpFeel)) != NULL) {
+		LINK(pFeel, first_feeling, last_feeling);
+	}
+
+	log_string("Load_Feelings: Done");
 	return;
 }
 
@@ -898,6 +982,46 @@ char *one_argument_two(char *argument, char *arg_first) {
 	return argument;
 }
 
+char *second_argument(char *argument, char *arg_second) {
+	char cEnd;
+
+	while (isspace(*argument))
+		argument++;
+
+	cEnd = ' ';
+	if (*argument == '\'' || *argument == '"')
+		cEnd = *argument++;
+
+	while (*argument != '\0') {
+		if (*argument == cEnd) {
+			if (cEnd != ' ') argument++;
+			if (*argument != ' ') break;
+			while (isspace(*argument))
+					argument++;
+//			cEnd = ' ';
+			if (*argument == '\'' || *argument == '"')
+					cEnd = *argument++;
+			while (*argument != '\0') {
+					if (*argument == cEnd) {
+						argument++;
+						break;
+					}
+					*arg_second = *argument;
+					arg_second++;
+					argument++;
+				}
+			break;
+		}
+		argument++;
+	}
+	*arg_second = '\0';
+
+	while (isspace(*argument))
+		argument++;
+
+	return argument;
+}
+
 /*
  * Given a string like 14.foo, return 14 and 'foo'
  */
@@ -1294,14 +1418,14 @@ void do_reboot(USER_DATA *usr, char *argument) {
 	fprintf(fp, "-1\n");
 	fclose(fp);
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 
 	sprintf(p_buf, "%d", port);
 	sprintf(c_buf, "%d", control);
 	execl(EXE_FILE, "bbs", p_buf, "copyover", c_buf, (char *) NULL);
 	perror("Do_copyover: execl");
 	send_to_user("ERROR: Copyover failed!\n\r", usr);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 }
 
 void copyover_recover(void) {
@@ -1689,10 +1813,10 @@ void load_config(void) {
 
 	log_string("Load_config: Loading config file");
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	if (!(fpConfig = fopen(CONFIG_FILE, "r"))) {
 		bbs_bug("Load_config: Could not open to read %s", CONFIG_FILE);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		config.bbs_name = "(Noname)";
 		config.bbs_email = "userid@host";
 		config.bbs_host = "localhost";
@@ -1719,7 +1843,7 @@ void load_config(void) {
 				;
 				if (!str_cmp(word, "End")) {
 					fclose(fpConfig);
-					fpReserve = fopen(NULL_FILE, "r");
+					//fpReserve = fopen(NULL_FILE, "r");
 					log_string("Load_config: Done");
 					return;
 				}
@@ -1772,10 +1896,10 @@ void save_config(void) {
 	FILE *fpConfig;
 	char *strtime;
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	if (!(fpConfig = fopen(CONFIG_FILE, "w"))) {
 		bbs_bug("Save_config: Could not open to save %s", CONFIG_FILE);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
@@ -1806,7 +1930,7 @@ void save_config(void) {
 	fprintf(fpConfig, "Flags   %s\n", print_flags(config.bbs_flags) );
 	fprintf(fpConfig, "End\n");
 	fclose(fpConfig);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 }
 

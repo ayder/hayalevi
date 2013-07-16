@@ -32,6 +32,7 @@
 /*
  * Board types.
  */
+/*
 #define BOARD_NORMAL		1
 #define BOARD_ADMIN			2
 #define BOARD_GAME			3
@@ -39,16 +40,50 @@
 #define BOARD_SECRET		5
 
 #define DEFAULT_CAPACITY	150
-
+*/
 BOARD_DATA *first_board;
 BOARD_DATA *last_board;
 
 /*
  * Functions.
  */
+/*
 void save_notes(BOARD_DATA * pBoard);
 bool is_kicked(USER_DATA * usr, BOARD_DATA * pBoard, bool fMessage);
 void do_quit_org(USER_DATA * usr, char *argument, bool fXing);
+*/
+
+/** title'i forum adina set edelim */
+void update_title(USER_DATA* usr, BOARD_DATA* pBoard) {
+	// TODO: Add TOGGLE support here.
+	print_to_user(usr, "\033]0;%s - %s [Mod: %s]\007", config.bbs_name, pBoard->long_name, pBoard->moderator);
+}
+
+void notify_forum_users(BOARD_DATA* pBoard, USER_DATA* usr, bool enter) {
+	if (!IS_TOGGLE(usr, TOGGLE_SAY)) {
+		return;
+	}
+	char buf[STRING_LENGTH];
+	USER_DATA* musr;
+	for (musr = user_list; musr != NULL; musr = musr->next) {
+		if (!str_cmp(usr->name, musr->name)) {
+			continue;
+		}
+		if (str_cmp(pBoard->short_name, musr->pBoard->short_name)) {
+			continue;
+		}
+		if (!IS_TOGGLE(musr, TOGGLE_SAY) || IS_TOGGLE(musr, TOGGLE_IDLE)) {
+			continue;
+		}
+		sprintf(buf, "[#Y%s#x] %s #B%s the forum.#x\n\r", pBoard->long_name,
+			colorize(musr, usr->name), enter ? "entered" : "left");
+		if (isBusySelf(musr)) {
+			add_buffer(musr, buf);
+		} else {
+			send_to_user(buf, musr);
+		}
+	}
+}
 
 /*
  * Find a board.
@@ -172,17 +207,17 @@ void archive_note(NOTE_DATA * pNote, BOARD_DATA * pBoard) {
 	char buf[INPUT];
 	FILE *fpArch;
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	sprintf(buf, "%sarchive/%s.arc", NOTE_DIR, pBoard->short_name);
 	if (!(fpArch = fopen(buf, "a"))) {
 		bbs_bug("Archive_note: Could not open to write %s", buf);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
 	append_note(fpArch, pNote);
 	fclose(fpArch);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 
 }
@@ -295,11 +330,11 @@ void save_notes(BOARD_DATA * pBoard) {
 	NOTE_DATA *pNote;
 	FILE *fpNote;
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	sprintf(buf, "%s%s.o", NOTE_DIR, pBoard->short_name);
 	if (!(fpNote = fopen(buf, "w"))) {
 		bbs_bug("Save_notes: Could not open to write %s", buf);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
@@ -307,7 +342,7 @@ void save_notes(BOARD_DATA * pBoard) {
 		append_note(fpNote, pNote);
 
 	fclose(fpNote);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 }
 
@@ -509,10 +544,10 @@ void save_boards(void) {
 	KICK_DATA *pKick;
 	FILE *fpBoard;
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	if (!(fpBoard = fopen(BOARD_FILE, "w"))) {
 		bbs_bug("Save_boards: Could not open to write %s", BOARD_FILE);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
@@ -534,7 +569,7 @@ void save_boards(void) {
 	}
 
 	fclose(fpBoard);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 }
 
@@ -654,17 +689,17 @@ void do_addforum(USER_DATA * usr, char *argument) {
 	}
 
 	if (strlen(arg) < 2 || strlen(arg) > 12) {
-		send_to_user("Forum name must be 2 to 12 characters.\n\r", usr);
+		send_to_user("Forum name must be 2 to 12 characters.\r\n", usr);
 		return;
 	}
 
 	if (atoi(argument) < 0) {
-		send_to_user("Illegal forum number.\n\r", usr);
+		send_to_user("Illegal forum number.\r\n", usr);
 		return;
 	}
 
 	if ((oldBoard = board_lookup(arg, FALSE))) {
-		sprintf(buf, "%s forum is already exists.\n\r",
+		sprintf(buf, "%s forum is already exists.\r\n",
 				capitalize(oldBoard->short_name));
 		send_to_user(buf, usr);
 		return;
@@ -672,7 +707,7 @@ void do_addforum(USER_DATA * usr, char *argument) {
 
 	for (oldBoard = first_board; oldBoard; oldBoard = oldBoard->next) {
 		if (board_number(oldBoard) == atoi(argument)) {
-			sprintf(buf, "%s (%d) forum is already exists.\n\r",
+			sprintf(buf, "%s (%d) forum is already exists.\r\n",
 					capitalize(oldBoard->short_name), oldBoard->vnum);
 			send_to_user(buf, usr);
 			return;
@@ -690,15 +725,17 @@ void do_addforum(USER_DATA * usr, char *argument) {
 	pBoard->capacity = DEFAULT_CAPACITY;
 	pBoard->type = BOARD_NORMAL;
 	pBoard->last_vnum = 0;
+	pBoard->first_kick = NULL;
+	pBoard->last_kick = NULL;
 	LINK(pBoard, first_board, last_board);
-	send_to_user("Ok, creating new forum.\n\r", usr);
-	sprintf(buf, "Forum name     : %s (%d)\n\r"
-		"Forum type     : Normal\n\r"
-		"Forum capacity : %d\n\r"
-		"Forum moderator: %s\n\r", pBoard->long_name, pBoard->vnum,
+	send_to_user("Ok, creating new forum.\r\n", usr);
+	sprintf(buf, "Forum name     : %s (%d)\r\n"
+		"Forum type     : Normal\r\n"
+		"Forum capacity : %d\r\n"
+		"Forum moderator: %s\r\n", pBoard->long_name, pBoard->vnum,
 			pBoard->capacity, pBoard->moderator);
 	send_to_user(buf, usr);
-	send_to_user("Use 'setforum' command to set values.\n\r", usr);
+	send_to_user("Use 'setforum' command to set values.\r\n", usr);
 	save_boards();
 	return;
 }
@@ -720,7 +757,7 @@ void do_delforum(USER_DATA * usr, char *argument) {
 	}
 
 	if (!(pBoard = board_lookup(arg, FALSE))) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
@@ -729,7 +766,7 @@ void do_delforum(USER_DATA * usr, char *argument) {
 			do_quit_org(oUser, "", FALSE);
 	}
 
-	sprintf(buf, "Ok, deleting %s forum.\n\r", capitalize(pBoard->short_name));
+	sprintf(buf, "Ok, deleting %s forum.\r\n", capitalize(pBoard->short_name));
 	send_to_user(buf, usr);
 	board_remove(pBoard);
 	return;
@@ -755,24 +792,24 @@ void do_setforum(USER_DATA * usr, char *argument) {
 	}
 
 	if (!(pBoard = board_lookup(arg1, FALSE))) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
 	if (!str_cmp(arg2, "name")) {
 		if (strlen(argument) < 2 || strlen(argument) > 12) {
-			send_to_user("Forum name must be 2 to 12 characters.\n\r", usr);
+			send_to_user("Forum name must be 2 to 12 characters.\r\n", usr);
 			return;
 		}
 
 		if ((oBoard = board_lookup(argument, FALSE))) {
-			sprintf(buf, "%s forum is already exists.\n\r",
+			sprintf(buf, "%s forum is already exists.\r\n",
 					capitalize(oBoard->short_name));
 			send_to_user(buf, usr);
 			return;
 		}
 
-		sprintf(buf, "Ok, %s forum renamed to %s.\n\r",
+		sprintf(buf, "Ok, %s forum renamed to %s.\r\n",
 				capitalize(pBoard->short_name), capitalize(argument));
 		send_to_user(buf, usr);
 		if (pBoard->short_name)
@@ -785,17 +822,17 @@ void do_setforum(USER_DATA * usr, char *argument) {
 		return;
 	} else if (!str_cmp(arg2, "long")) {
 		if (strlen(argument) < 2 || strlen(argument) > 12) {
-			send_to_user("Forum name must be 2 to 12 characters.\n\r", usr);
+			send_to_user("Forum name must be 2 to 12 characters.\r\n", usr);
 			return;
 		}
 
 		if (str_cmp(pBoard->short_name, argument)) {
 			send_to_user("The long name must be the same with the short "
-				"name.\n\r", usr);
+				"name.\r\n", usr);
 			return;
 		}
 
-		sprintf(buf, "Ok, %s forum's long name now %s.\n\r",
+		sprintf(buf, "Ok, %s forum's long name now %s.\r\n",
 				capitalize(pBoard->short_name), argument);
 		send_to_user(buf, usr);
 		if (pBoard->long_name)
@@ -805,12 +842,12 @@ void do_setforum(USER_DATA * usr, char *argument) {
 		return;
 	} else if (!str_cmp(arg2, "capacity")) {
 		if (!is_number(argument) || atoi(argument) < 1 || atoi(argument) > 1000) {
-			send_to_user("Illegal forum capacity number.\n\r", usr);
+			send_to_user("Illegal forum capacity number.\r\n", usr);
 			return;
 		}
 
 		pBoard->capacity = atoi(argument);
-		sprintf(buf, "Ok, %s forum's note capacity now %d.\n\r",
+		sprintf(buf, "Ok, %s forum's note capacity now %d.\r\n",
 				capitalize(pBoard->short_name), pBoard->capacity);
 		send_to_user(buf, usr);
 		save_boards();
@@ -818,18 +855,18 @@ void do_setforum(USER_DATA * usr, char *argument) {
 	} else if (!str_cmp(arg2, "moderator")) {
 		if (pBoard->type == BOARD_GAME || pBoard->type == BOARD_SECRET
 				|| pBoard->type == BOARD_ADMIN) {
-			send_to_user("No moderator data on this forum.\n\r", usr);
+			send_to_user("No moderator data on this forum.\r\n", usr);
 			return;
 		}
 
 		if (!str_cmp(argument, "none")) {
 			if (!str_cmp(pBoard->moderator, "None")) {
-				print_to_user(usr, "%s forum's moderator is already None.\n\r",
+				print_to_user(usr, "%s forum's moderator is already None.\r\n",
 						capitalize(pBoard->short_name));
 				return;
 			}
 
-			print_to_user(usr, "Ok, %s forum's moderator is None now.\n\r",
+			print_to_user(usr, "Ok, %s forum's moderator is None now.\r\n",
 					capitalize(pBoard->short_name));
 			if (pBoard->moderator)
 				free_string(pBoard->moderator);
@@ -838,20 +875,20 @@ void do_setforum(USER_DATA * usr, char *argument) {
 			return;
 		} else {
 			if (str_cmp(pBoard->moderator, "None")) {
-				sprintf(buf, "%s forum's moderator is already %s.\n\r"
+				sprintf(buf, "%s forum's moderator is already %s.\r\n"
 					"Type 'setforum %s moderator none' to "
-					" remove.\n\r", capitalize(pBoard->short_name),
+					" remove.\r\n", capitalize(pBoard->short_name),
 						pBoard->moderator, pBoard->short_name);
 				send_to_user(buf, usr);
 				return;
 			}
 
 			if (!is_user(argument)) {
-				send_to_user("No such user.\n\r", usr);
+				send_to_user("No such user.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Ok, %s is new moderator of %s forum.\n\r",
+			sprintf(buf, "Ok, %s is new moderator of %s forum.\r\n",
 					capitalize(argument), capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			if (pBoard->moderator)
@@ -863,11 +900,11 @@ void do_setforum(USER_DATA * usr, char *argument) {
 	} else if (!str_cmp(arg2, "type")) {
 		if (!str_cmp(argument, "normal")) {
 			if (pBoard->type == BOARD_NORMAL) {
-				send_to_user("Forum type is already normal.\n\r", usr);
+				send_to_user("Forum type is already normal.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Added normal type to %s forum.\n\r",
+			sprintf(buf, "Added normal type to %s forum.\r\n",
 					capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			pBoard->type = BOARD_NORMAL;
@@ -875,11 +912,11 @@ void do_setforum(USER_DATA * usr, char *argument) {
 			return;
 		} else if (!str_cmp(argument, "game")) {
 			if (pBoard->type == BOARD_GAME) {
-				send_to_user("Forum type is already game.\n\r", usr);
+				send_to_user("Forum type is already game.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Added game type to %s forum.\n\r",
+			sprintf(buf, "Added game type to %s forum.\r\n",
 					capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			pBoard->type = BOARD_GAME;
@@ -887,11 +924,11 @@ void do_setforum(USER_DATA * usr, char *argument) {
 			return;
 		} else if (!str_cmp(argument, "admin")) {
 			if (pBoard->type == BOARD_ADMIN) {
-				send_to_user("Forum type is already admin.\n\r", usr);
+				send_to_user("Forum type is already admin.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Added admin type to %s forum.\n\r",
+			sprintf(buf, "Added admin type to %s forum.\r\n",
 					capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			pBoard->type = BOARD_ADMIN;
@@ -899,11 +936,11 @@ void do_setforum(USER_DATA * usr, char *argument) {
 			return;
 		} else if (!str_cmp(argument, "anonymous")) {
 			if (pBoard->type == BOARD_ANONYMOUS) {
-				send_to_user("Forum type is already anonymous.\n\r", usr);
+				send_to_user("Forum type is already anonymous.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Added anonymous type to %s forum.\n\r",
+			sprintf(buf, "Added anonymous type to %s forum.\r\n",
 					capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			pBoard->type = BOARD_ANONYMOUS;
@@ -911,20 +948,20 @@ void do_setforum(USER_DATA * usr, char *argument) {
 			return;
 		} else if (!str_cmp(argument, "secret")) {
 			if (pBoard->type == BOARD_SECRET) {
-				send_to_user("Forum type is already secret.\n\r", usr);
+				send_to_user("Forum type is already secret.\r\n", usr);
 				return;
 			}
 
-			sprintf(buf, "Added secret type to %s forum.\n\r",
+			sprintf(buf, "Added secret type to %s forum.\r\n",
 					capitalize(pBoard->short_name));
 			send_to_user(buf, usr);
 			pBoard->type = BOARD_SECRET;
 			save_boards();
 			return;
 		} else {
-			send_to_user("That's not a valid forum type.\n\r"
+			send_to_user("That's not a valid forum type.\r\n"
 				"Available arguments are: normal, game, moderator, "
-				"admin, anonymous, secret.\n\r", usr);
+				"admin, anonymous, secret.\r\n", usr);
 			return;
 		}
 	} else {
@@ -947,7 +984,7 @@ void do_showmods(USER_DATA * usr, char *argument) {
 	output = new_buf();
 
 	add_buf(output, "Forum name    Moderator      | ");
-	add_buf(output, "Forum name    Moderator      |\n\r");
+	add_buf(output, "Forum name    Moderator      |\r\n");
 	for (pBoard = first_board; pBoard; pBoard = pBoard->next) {
 		if (str_cmp(pBoard->moderator, "None")) {
 			found = TRUE;
@@ -955,15 +992,15 @@ void do_showmods(USER_DATA * usr, char *argument) {
 					pBoard->moderator);
 			add_buf(output, buf);
 			if (++col % 2 == 0)
-				add_buf(output, "\n\r");
+				add_buf(output, "\r\n");
 		}
 	}
 
 	if (col % 2 != 0)
-		add_buf(output, "\n\r");
+		add_buf(output, "\r\n");
 
 	if (!found) {
-		send_to_user("None.\n\r", usr);
+		send_to_user("None.\r\n", usr);
 		free_buf(output);
 		return;
 	}
@@ -999,26 +1036,26 @@ void do_statforum(USER_DATA * usr, char *argument) {
 				count_kick++;
 		}
 
-		sprintf(buf, "Forum: %4d -- %5d bytes\n\r", count_board, count_board
+		sprintf(buf, "Forum: %4d -- %5d bytes\r\n", count_board, count_board
 				* (sizeof(*pBoard)));
 		send_to_user(buf, usr);
 
-		sprintf(buf, "Note : %4d -- %5d bytes\n\r", count_note, count_note
+		sprintf(buf, "Note : %4d -- %5d bytes\r\n", count_note, count_note
 				* (sizeof(*pNote)));
 		send_to_user(buf, usr);
 
-		sprintf(buf, "Kick : %4d -- %5d bytes\n\r", count_kick, count_kick
+		sprintf(buf, "Kick : %4d -- %5d bytes\r\n", count_kick, count_kick
 				* (sizeof(*pKick)));
 		send_to_user(buf, usr);
 		return;
 	}
 
 	if (!(pBoard = board_lookup(arg, FALSE))) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
-	sprintf(buf, "%s (%d) forum stats -- %d bytes:\n\r", pBoard->long_name,
+	sprintf(buf, "%s (%d) forum stats -- %d bytes:\r\n", pBoard->long_name,
 			pBoard->vnum, sizeof(*pBoard));
 	send_to_user(buf, usr);
 
@@ -1030,15 +1067,15 @@ void do_statforum(USER_DATA * usr, char *argument) {
 	for (pKick = pBoard->first_kick; pKick; pKick = pKick->next)
 		count_kick++;
 
-	sprintf(buf, "* Note: %4d -- %5d bytes\n\r", count_note, count_note
+	sprintf(buf, "* Note: %4d -- %5d bytes\r\n", count_note, count_note
 			* (sizeof(*pNote)));
 	send_to_user(buf, usr);
 
-	sprintf(buf, "* Kick: %4d -- %5d bytes\n\r", count_kick, count_kick
+	sprintf(buf, "* Kick: %4d -- %5d bytes\r\n", count_kick, count_kick
 			* (sizeof(*pKick)));
 	send_to_user(buf, usr);
 
-	sprintf(buf, "* Capacity: %d - Type: %s\n\r", pBoard->capacity,
+	sprintf(buf, "* Capacity: %d - Type: %s\r\n", pBoard->capacity,
 			pBoard->type == BOARD_NORMAL ? "Normal" : pBoard->type
 					== BOARD_ADMIN ? "Admin"
 					: pBoard->type == BOARD_GAME ? "Game" : pBoard->type
@@ -1046,7 +1083,7 @@ void do_statforum(USER_DATA * usr, char *argument) {
 							== BOARD_SECRET ? "Secret" : "*Undefined*");
 	send_to_user(buf, usr);
 
-	sprintf(buf, "* Moderator: %s\n\r", pBoard->moderator);
+	sprintf(buf, "* Moderator: %s\r\n", pBoard->moderator);
 	send_to_user(buf, usr);
 	return;
 }
@@ -1062,7 +1099,7 @@ void do_jump(USER_DATA * usr, char *argument) {
 	one_argument(argument, arg);
 
 	if (arg[0] == '\0') {
-		send_to_user("Jump which forum?\n\r", usr);
+		send_to_user("Jump which forum?\r\n", usr);
 		return;
 	}
 
@@ -1071,83 +1108,91 @@ void do_jump(USER_DATA * usr, char *argument) {
 
 	if (((!(pBoard = board_lookup(arg, FALSE))) && !fNumber) || ((!(pBoard
 			= board_lookup(arg, TRUE))) && fNumber)) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
 	if (pBoard->type == BOARD_SECRET && !IS_ADMIN(usr)) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
 	if (usr->pBoard == pBoard) {
-		print_to_user(usr, "You are already in %s.\n\r",
+		print_to_user(usr, "You are already in %s.\r\n",
 				capitalize(pBoard->short_name));
 		return;
 	}
 	if (usr->gender == 0 && !strcmp(pBoard->long_name, "Womenonly") ) {
-		send_to_user("Male users are not allowed to jump in this forum.\n\r",
+		send_to_user("Male users are not allowed to jump in this forum.\r\n",
 				usr);
 		return;
 	}
 
 	if (pBoard == board_lookup("chat", FALSE)) {
 		if (!usr->Validated) {
-			send_to_user("Unvalidated users can't use chat room.\n\r", usr);
+			send_to_user("Unvalidated users can't use chat room.\r\n", usr);
 			return;
 		}
 
-		send_to_user("You are in the chat room now.\n\r\n\r"
-			"Chat room commands are:\n\r"
-			"    /look     to list the users in chat room\n\r"
-			"    /emote    to emote\n\r"
-			"    /exit     to leave the chat room\n\r\n\r", usr);
+		send_to_user("You are in the chat room now.\r\r\n\n"
+			"Chat room commands are:\r\n"
+			"    /look     to list the users in chat room\r\n"
+			"    /emote    to emote\r\n"
+			"    /exit     to leave the chat room\r\r\n\n", usr);
 		cmd_chat_emote(usr, "enters the chat room.");
 		usr->pBoard = pBoard;
 		cmd_chat_look(usr);
 		return;
 	}
 
+        // title'i forum adina set edelim
+	update_title(usr, pBoard);
+
 	if (pBoard->type == BOARD_ADMIN || pBoard->type == BOARD_GAME) {
 		if (usr->pBoard == board_lookup("chat", FALSE)) {
 			cmd_chat_emote(usr, "leaves the chat room.");
-			send_to_user("You left the chat room.\n\r", usr);
+			send_to_user("You left the chat room.\r\n", usr);
 		}
 
-		sprintf(buf, "You are in the %s now.\n\r", pBoard->short_name);
+		sprintf(buf, "You are in the %s now.\r\n", pBoard->short_name);
 		send_to_user(buf, usr);
+		notify_forum_users(usr->pBoard, usr, FALSE);
 		usr->pBoard = pBoard;
+		notify_forum_users(usr->pBoard, usr, TRUE);
 		return;
 	}
 
 	if (usr->pBoard == board_lookup("chat", FALSE)) {
 		cmd_chat_emote(usr, "leaves the chat room.");
-		send_to_user("You left the chat room.\n\r", usr);
+		send_to_user("You left the chat room.\r\n", usr);
 	}
 
-	print_to_user(usr, "You are in the forum called #G%s#w.\n\r",
-			pBoard->long_name);
-	send_to_user("You can set up new notes with the command 'note <subject>'."
-		"\n\r" "Read a note with 'read num'. You can clip a note to your"
-		"\n\r"
-		"clipboard with 'clip num'. And you can see notes with 'list'"
-		"\n\r" "command. Type 'new' to read new notes.\n\r", usr);
-	print_to_user(usr, "Forum moderator: %s\n\r", pBoard->moderator);
+	print_to_user(usr, "You are in the #G%s#w forum.\r\n", pBoard->long_name);
+	if (!IS_TOGGLE(usr, TOGGLE_HELP)) {
+		send_to_user("You can set up new notes with the command 'note <subject>'."
+			"\r\n" "Read a note with 'read num'. You can clip a note to your"
+			"\r\n"
+			"clipboard with 'clip num'. And you can see notes with 'list'"
+			"\r\n" "command. Type 'new' to read new notes.\r\n", usr);
+	}
+	print_to_user(usr, "Forum moderator: %s\r\n", pBoard->moderator);
 
 	i = total_notes(usr, pBoard);
 
 	if (i > 0)
-		print_to_user(usr, "Total %d message%s.\n\r", i, i > 1 ? "s" : "");
+		print_to_user(usr, "Total %d message%s.\r\n", i, i > 1 ? "s" : "");
 
 	i = unread_notes(usr, pBoard);
 
 	if (i > 0)
-		sprintf(buf, "%d NEW MESSAGE%s.\n\r", i, i > 1 ? "s" : "");
+		sprintf(buf, "%d NEW MESSAGE%s.\r\n", i, i > 1 ? "s" : "");
 	else
-		sprintf(buf, "NO NEW MESSAGES.\n\r");
+		sprintf(buf, "NO NEW MESSAGES.\r\n");
 
 	send_to_user(buf, usr);
+	notify_forum_users(usr->pBoard, usr, FALSE);
 	usr->pBoard = pBoard;
+	notify_forum_users(usr->pBoard, usr, TRUE);
 	if (!pBoard->last_note) {
 		usr->current_note = NULL;
 		return;
@@ -1167,11 +1212,12 @@ void do_jump(USER_DATA * usr, char *argument) {
 		usr->current_note = usr->current_note->prev;
 		goto again;
 	}
+	usr->lastpreviewed_note = usr->current_note;
 
 	return;
 }
 
-void do_forumlist(USER_DATA * usr, char *argument) {
+void do_forumlist_old(USER_DATA * usr, char *argument) {
 	char buf[STRING];
 	char forum_list[STRING];
 	BUFFER *output;
@@ -1181,7 +1227,7 @@ void do_forumlist(USER_DATA * usr, char *argument) {
 	forum_list[0] = '\0';
 	output = new_buf();
 
-	add_buf(output, "#GKnown forums:#x\n\r");
+	add_buf(output, "#GKnown forums:#x\r\n");
 
 	for (pBoard = first_board; pBoard; pBoard = pBoard->next) {
 		if (pBoard->type == BOARD_SECRET)
@@ -1194,11 +1240,11 @@ void do_forumlist(USER_DATA * usr, char *argument) {
 				FALSE) ? "!" : " ", pBoard->vnum, pBoard->long_name);
 		strcat(forum_list, buf);
 		if (++col % 4 == 0)
-			strcat(forum_list, "\n\r");
+			strcat(forum_list, "\r\n");
 	}
 
 	if (col % 4 != 0)
-		strcat(forum_list, "\n\r");
+		strcat(forum_list, "\r\n");
 
 	add_buf(output, forum_list);
 	add_buf(output, "#x");
@@ -1221,50 +1267,50 @@ void do_zap(USER_DATA * usr, char *argument) {
 	output = new_buf();
 
 	if (arg[0] == '\0') {
-		add_buf(output, "#GList of zapped forums:#R\n\r");
+		add_buf(output, "#GList of zapped forums:#R\r\n");
 
 		for (pBoard = first_board; pBoard; pBoard = pBoard->next) {
 			if (is_name_full(pBoard->short_name, usr->zap)) {
 				sprintf(buf, "%2d. %-10s   ", pBoard->vnum, pBoard->long_name);
 				strcat(zap_list, buf);
 				if (++col % 4 == 0)
-					strcat(zap_list, "\n\r");
+					strcat(zap_list, "\r\n");
 			}
 		}
 
 		if (col % 4 != 0)
-			strcat(zap_list, "\n\r");
+			strcat(zap_list, "\r\n");
 
 		add_buf(output, zap_list);
-		add_buf(output, "\n\r#xTry giving a forum name/number as an "
-			"argument to this command.\n\r");
+		add_buf(output, "\r\n#xTry giving a forum name/number as an "
+			"argument to this command.\r\n");
 		page_to_user(buf_string(output), usr);
 		free_buf(output);
 		return;
 	} else {
 		if (!(pBoard = board_lookup(arg, is_number(arg)))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_SECRET && !IS_ADMIN(usr)) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (is_name_full(pBoard->short_name, usr->zap)) {
-			sprintf(buf, "You don't actually read %s.\n\r", pBoard->long_name);
+			sprintf(buf, "You don't actually read %s.\r\n", pBoard->long_name);
 			send_to_user(buf, usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_GAME || pBoard->type == BOARD_ADMIN) {
-			sprintf(buf, "You can't zap %s.\n\r", pBoard->long_name);
+			sprintf(buf, "You can't zap %s.\r\n", pBoard->long_name);
 			send_to_user(buf, usr);
 			return;
 		}
 
-		sprintf(buf, "You zapped #G%s#w.\n\r", pBoard->long_name);
+		sprintf(buf, "You zapped #G%s#w.\r\n", pBoard->long_name);
 		send_to_user(buf, usr);
 		buf[0] = '\0';
 		strcpy(buf, pBoard->short_name);
@@ -1302,7 +1348,7 @@ void do_fnotify(USER_DATA * usr, char *argument) {
 	output = new_buf();
 
 	if (arg[0] == '\0') {
-		add_buf(output, "#GList of notified forums:#W\n\r");
+		add_buf(output, "#GList of notified forums:#W\r\n");
 
 		for (pBoard = first_board; pBoard; pBoard = pBoard->next) {
 			if (is_name_full(pBoard->short_name, usr->fnotify)) {
@@ -1310,16 +1356,16 @@ void do_fnotify(USER_DATA * usr, char *argument) {
 				sprintf(buf, "%2d. %-10s   ", pBoard->vnum, pBoard->long_name);
 				strcat(not_list, buf);
 				if (++col % 4 == 0)
-					strcat(not_list, "\n\r");
+					strcat(not_list, "\r\n");
 			}
 		}
 
 		if (col % 4 != 0)
-			strcat(not_list, "\n\r");
+			strcat(not_list, "\r\n");
 
 		if (!found) {
 			send_to_user(
-					"You don't have any entry in you forum notify list.\n\r",
+					"You don't have any entry in you forum notify list.\r\n",
 					usr);
 			free_buf(output);
 			return;
@@ -1336,23 +1382,23 @@ void do_fnotify(USER_DATA * usr, char *argument) {
 		}
 
 		if (!(pBoard = board_lookup(argument, FALSE))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_SECRET && !IS_ADMIN(usr)) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (!is_name_full(pBoard->short_name, usr->fnotify)) {
-			sprintf(buf, "%s forum isn't in your forum notify list.\n\r",
+			sprintf(buf, "%s forum isn't in your forum notify list.\r\n",
 					pBoard->long_name);
 			send_to_user(buf, usr);
 			return;
 		}
 
-		print_to_user(usr, "Forum notify #W%s#x removed.\n\r",
+		print_to_user(usr, "Forum notify #W%s#x removed.\r\n",
 				pBoard->long_name);
 		buf[0] = '\0';
 		sprintf(buf, "%s ", pBoard->short_name);
@@ -1360,36 +1406,36 @@ void do_fnotify(USER_DATA * usr, char *argument) {
 			usr->fnotify = string_replace(usr->fnotify, buf, "");
 		return;
 	} else if (!str_cmp(arg, "-f")) {
-		send_to_user("Flushing the your forum notify list.\n\r", usr);
+		send_to_user("Flushing the your forum notify list.\r\n", usr);
 		if (usr->fnotify)
 			free_string(usr->fnotify);
 		usr->fnotify = str_dup("");
-		send_to_user("Done.\n\r", usr);
+		send_to_user("Done.\r\n", usr);
 		return;
 	} else {
 		if (!(pBoard = board_lookup(arg, FALSE))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_SECRET && !IS_ADMIN(usr)) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (is_name_full(pBoard->short_name, usr->fnotify)) {
-			sprintf(buf, "%s forum is already in your forum notify list.\n\r",
+			sprintf(buf, "%s forum is already in your forum notify list.\r\n",
 					pBoard->long_name);
 			send_to_user(buf, usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_GAME || pBoard->type == BOARD_ADMIN) {
-			send_to_user("You can't add your notify list this forum.\n\r", usr);
+			send_to_user("You can't add your notify list this forum.\r\n", usr);
 			return;
 		}
 
-		sprintf(buf, "New forum notify: #W%s#x.\n\r", pBoard->long_name);
+		sprintf(buf, "New forum notify: #W%s#x.\r\n", pBoard->long_name);
 		send_to_user(buf, usr);
 		buf[0] = '\0';
 		strcpy(buf, pBoard->short_name);
@@ -1403,12 +1449,12 @@ void do_fnotify(USER_DATA * usr, char *argument) {
 		sprintf(buf, "%s ", pBoard->short_name);
 		if (is_name_full(buf, usr->zap)) {
 			usr->zap = string_replace(usr->zap, buf, "");
-			print_to_user(usr, "%s forum unzapped.\n\r", pBoard->long_name);
+			print_to_user(usr, "%s forum unzapped.\r\n", pBoard->long_name);
 		}
 		return;
 	}
 
-	send_to_user("Try 'help fnotify' for more information.\n\r", usr);
+	send_to_user("Try 'help fnotify' for more information.\r\n", usr);
 	return;
 }
 
@@ -1422,19 +1468,19 @@ void do_info(USER_DATA * usr, char *argument) {
 
 	if (pBoard->type == BOARD_GAME || (pBoard->type == BOARD_SECRET
 			&& !IS_ADMIN(usr))) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
-	sprintf(buf, "Forum name     : %s\n\r"
-		"Forum moderator: %s\n\r"
-		"Total notes    : %d\n\r"
-		"Unread notes   : %d\n\r"
-		"Forum info     :\n\r", pBoard->long_name, pBoard->moderator,
+	sprintf(buf, "Forum name     : %s\r\n"
+		"Forum moderator: %s\r\n"
+		"Total notes    : %d\r\n"
+		"Unread notes   : %d\r\n"
+		"Forum info     :\r\n", pBoard->long_name, pBoard->moderator,
 			total_notes(usr, pBoard), unread_notes(usr, pBoard));
 	add_buf(output, buf);
 	add_buf(output, pBoard->info);
-	add_buf(output, "\n\r");
+	add_buf(output, "\r\n");
 	page_to_user(buf_string(output), usr);
 	free_buf(output);
 	return;
@@ -1455,12 +1501,12 @@ void do_list(USER_DATA * usr, char *argument) {
 	pBoard = usr->pBoard;
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (pBoard == board_lookup("chat", FALSE)) {
-		send_to_user("You can't read chat forum.\n\r", usr);
+		send_to_user("You can't read chat forum.\r\n", usr);
 		return;
 	}
 
@@ -1472,14 +1518,14 @@ void do_list(USER_DATA * usr, char *argument) {
 		}
 		if (arg[0] != '\0') {
 			if (!is_user(arg)) {
-				send_to_user("No such user.\n\r", usr);
+				send_to_user("No such user.\r\n", usr);
 				return;
 			}
 			fName = TRUE;
 		}
 	}
 
-	sprintf(buf, "#GThe Bulletin Board contains #Y%d #Gnotes:#x\n\r\n\r",
+	sprintf(buf, "#GThe Bulletin Board contains #Y%d #Gnotes:#x\r\r\n\n",
 			total_notes(usr, pBoard));
 	add_buf(output, buf);
 
@@ -1501,7 +1547,7 @@ void do_list(USER_DATA * usr, char *argument) {
 		int slc = strlen_color(pNote->subject);
 		int sl = strlen(pNote->subject);
 		int swidth = 26 + (sl - slc);
-		sprintf(buf, "%3d #m#%-6ld %-16s  #g%-*s #y%s#x\n\r", vnum,
+		sprintf(buf, "%3d #m#%-6ld %-16s  #g%-*s #y%s#x\r\n", vnum,
 				pNote->vnum, colorize(usr, pNote->sender), swidth,
 				pNote->subject, pNote->date);
 		add_buf(output, buf);
@@ -1516,9 +1562,9 @@ void do_list(USER_DATA * usr, char *argument) {
 
 	free_buf(output);
 	if (last_read) {
-		send_to_user("No new messages.\n\r", usr);
+		send_to_user("No new messages.\r\n", usr);
 	} else {
-		send_to_user("No such message.\n\r", usr);
+		send_to_user("No such message.\r\n", usr);
 	}
 	return;
 }
@@ -1546,21 +1592,21 @@ void do_remove_org(USER_DATA * usr, char *argument, bool fMessage) {
 
 	if (pBoard->type == BOARD_GAME) {
 		if (fMessage)
-			send_to_user("Unknown command.\n\r", usr);
+			send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (pBoard->type == BOARD_ADMIN && !IS_ADMIN(usr)) {
 		if (fMessage)
 			send_to_user(
-					"Users are not allowed to remove notes in this forum.\n\r",
+					"Users are not allowed to remove notes in this forum.\r\n",
 					usr);
 		return;
 	}
 
 	if (arg[0] == '\0') {
 		if (fMessage)
-			send_to_user("Remove which note?\n\r", usr);
+			send_to_user("Remove which note?\r\n", usr);
 		return;
 	}
 
@@ -1571,7 +1617,7 @@ void do_remove_org(USER_DATA * usr, char *argument, bool fMessage) {
 
 	if (!is_number(arg_num)) {
 		if (fMessage)
-			send_to_user("Remove which note?\n\r", usr);
+			send_to_user("Remove which note?\r\n", usr);
 		return;
 	}
 
@@ -1580,7 +1626,7 @@ void do_remove_org(USER_DATA * usr, char *argument, bool fMessage) {
 	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
 		if ((++vnum == anum && !fNumber) || (fNumber && anum == pNote->vnum)) {
 			if (can_remove(usr, pNote)) {
-				sprintf(buf, "You remove the note %s (%s).\n\r", pNote->sender,
+				sprintf(buf, "You remove the note %s (%s).\r\n", pNote->sender,
 						pNote->subject);
 				if (fMessage)
 					send_to_user(buf, usr);
@@ -1589,14 +1635,14 @@ void do_remove_org(USER_DATA * usr, char *argument, bool fMessage) {
 			} else {
 				if (fMessage)
 					send_to_user("Sorry, you will have to ask a moderator to "
-						"remove the message for you.\n\r", usr);
+						"remove the message for you.\r\n", usr);
 				return;
 			}
 		}
 	}
 
 	if (fMessage)
-		send_to_user("No such message.\n\r", usr);
+		send_to_user("No such message.\r\n", usr);
 	return;
 }
 
@@ -1604,7 +1650,7 @@ void do_remove(USER_DATA * usr, char *argument) {
 	do_remove_org(usr, argument, TRUE);
 }
 
-void do_newmsgs(USER_DATA * usr, char *argument) {
+void do_newmsgs_old(USER_DATA * usr, char *argument) {
 	char buf[STRING];
 	char nw_buf[STRING];
 	char no_buf[STRING];
@@ -1640,7 +1686,7 @@ void do_newmsgs(USER_DATA * usr, char *argument) {
 					unread_notes(usr, pBoard));
 			strcat(nw_buf, buf);
 			if (++col_new % 3 == 0)
-				strcat(nw_buf, "\n\r");
+				strcat(nw_buf, "\r\n");
 		} else if (pBoard->type != BOARD_GAME && pBoard->type != BOARD_SECRET
 				&& !is_name_full(zap, usr->zap)) {
 			foundNo = TRUE;
@@ -1650,17 +1696,17 @@ void do_newmsgs(USER_DATA * usr, char *argument) {
 			FALSE) ? "!" : " ", pBoard->vnum, pBoard->long_name);
 			strcat(no_buf, buf);
 			if (++col_no % 4 == 0)
-				strcat(no_buf, "\n\r");
+				strcat(no_buf, "\r\n");
 		}
 	}
 
 	if (col_new % 3 != 0)
-		strcat(nw_buf, "\n\r");
+		strcat(nw_buf, "\r\n");
 	if (col_no % 4 != 0)
-		strcat(no_buf, "\n\r");
+		strcat(no_buf, "\r\n");
 
 	if (foundNew) {
-		add_buf(output, "#GNEW MESSAGES in:#x\n\r");
+		add_buf(output, "#GNEW MESSAGES in:#x\r\n");
 		add_buf(output, nw_buf);
 	}
 
@@ -1671,9 +1717,9 @@ void do_newmsgs(USER_DATA * usr, char *argument) {
 	}
 
 	if (foundNew)
-		add_buf(output, "\n\r#GNO NEW MESSAGES in:#x\n\r");
+		add_buf(output, "\r\n#GNO NEW MESSAGES in:#x\r\n");
 	else
-		add_buf(output, "#GNO NEW MESSAGES in:#x\n\r");
+		add_buf(output, "#GNO NEW MESSAGES in:#x\r\n");
 
 	add_buf(output, no_buf);
 	add_buf(output, "#x");
@@ -1700,17 +1746,17 @@ void do_read(USER_DATA * usr, char *argument) {
 	output = new_buf();
 
 	if (!usr->Validated) {
-		send_to_user("Unvalidated users can't read messages.\n\r", usr);
+		send_to_user("Unvalidated users can't read messages.\r\n", usr);
 		return;
 	}
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (arg[0] == '\0') {
-		send_to_user("Read which note?\n\r", usr);
+		send_to_user("Read which note?\r\n", usr);
 		return;
 	}
 
@@ -1720,7 +1766,7 @@ void do_read(USER_DATA * usr, char *argument) {
 	}
 
 	if (!is_number(arg_num)) {
-		send_to_user("Read which note?\n\r", usr);
+		send_to_user("Read which note?\r\n", usr);
 		return;
 	}
 
@@ -1728,7 +1774,7 @@ void do_read(USER_DATA * usr, char *argument) {
 
 	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
 		if ((++vnum == anum && !fNumber) || (fNumber && anum == pNote->vnum)) {
-			sprintf(buf, "%d #m#%ld  %s  #y%s, #GSubject: #x%s#x\n\r\n\r",
+			sprintf(buf, "%d #m#%ld  %s  #y%s, #GSubject: #x%s#x\r\r\n\n",
 					vnum, pNote->vnum, colorize(usr, pNote->sender),
 					pNote->date, pNote->subject);
 			add_buf(output, buf);
@@ -1746,6 +1792,7 @@ void do_read(USER_DATA * usr, char *argument) {
 				update_read(usr, pNote);
 
 			usr->current_note = pNote;
+			usr->lastpreviewed_note = pNote;
 
 			sprintf(buf, "%s ", pBoard->short_name);
 			if (is_name_full(buf, usr->zap))
@@ -1754,7 +1801,105 @@ void do_read(USER_DATA * usr, char *argument) {
 		}
 	}
 
-	send_to_user("No such message.\n\r", usr);
+	send_to_user("No such message.\r\n", usr);
+	return;
+}
+
+void do_readinterval(USER_DATA * usr, char *argument) {
+	char buf[STRING];
+	char arg[INPUT];
+	char arg2[INPUT];
+	BUFFER *output;
+	BOARD_DATA *pBoard;
+	NOTE_DATA *pNote;
+	bool fNumber= FALSE;
+	bool noteFound = FALSE;
+	char *arg_num;
+	char *arg_num2;
+	int vnum = 0;
+	int anum = 0;
+	int anum2 = 0;
+
+	one_argument(argument, arg);
+	second_argument(argument, arg2);
+	arg_num = str_dup(arg);
+	arg_num2 = str_dup(arg2);
+	pBoard = usr->pBoard;
+	output = new_buf();
+
+	if (!usr->Validated) {
+		send_to_user("Unvalidated users can't read messages.\r\n", usr);
+		return;
+	}
+
+	if (pBoard->type == BOARD_GAME) {
+		send_to_user("Unknown command.\r\n", usr);
+		return;
+	}
+
+	if (arg[0] == '\0') {
+		send_to_user("Read which note?\r\n", usr);
+		return;
+	}
+
+	if (arg[0] == '#') {
+		fNumber = TRUE;
+		arg_num++;
+	}
+
+	if (!is_number(arg_num)) {
+		send_to_user("Read which note?\r\n", usr);
+		return;
+	}
+	
+//	sprintf(buf, "You want to read between %s and %s\r\n",arg_num, arg_num2);
+//	send_to_user(buf, usr);return;
+
+	anum = atoi(arg_num);
+	anum2 = atoi(arg_num2);
+
+	if (anum > anum2++){
+		send_to_user("No such message.\r\n", usr);
+		return;
+	}
+
+	if (anum2 - anum > 10) {
+		send_to_user("Sorry, maximum interval (for now) is 10.\r\n", usr);
+		return;
+	}
+	
+	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
+		if ((++vnum == anum && !fNumber) || (fNumber && anum == pNote->vnum)) {
+			sprintf(buf, "%d #m#%ld  %s  #y%s, #GSubject: #x%s#x\r\r\n\n",
+					vnum, pNote->vnum, colorize(usr, pNote->sender),
+					pNote->date, pNote->subject);
+			add_buf(output, buf);
+			add_buf(output, pNote->text);
+			add_buf(output, "#x");
+			
+			anum++;
+			if (anum == anum2){
+				noteFound = TRUE;
+				break;
+			}
+		}
+	}
+	if (noteFound){
+		page_to_user(buf_string(output), usr);
+		free_buf(output);
+	
+		update_read(usr, pNote);
+	
+		usr->current_note = pNote;
+		usr->lastpreviewed_note = pNote;
+	
+		sprintf(buf, "%s ", pBoard->short_name);
+		if (is_name_full(buf, usr->zap))
+			usr->zap = string_replace(usr->zap, buf, "");
+		return;
+	}
+	
+	send_to_user("No such message.\r\n", usr);
 	return;
 }
 
@@ -1771,7 +1916,7 @@ void do_readall(USER_DATA * usr, char *argument) {
 		usr->current_note = usr->pBoard->last_note;
 	else
 		usr->current_note = NULL;
-	send_to_user("You read all forums.\n\r", usr);
+	send_to_user("You read all forums.\r\n", usr);
 	return;
 }
 
@@ -1780,16 +1925,16 @@ void do_next(USER_DATA * usr, char *argument) {
 	char buf[INPUT];
 
 	if (usr->pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
-	if (!usr->current_note) {
-		send_to_user("No such message.\n\r", usr);
+	if (!usr->lastpreviewed_note) {
+		send_to_user("No such message.\r\n", usr);
 		return;
 	}
 
-	pNote = usr->current_note->next;
+	pNote = usr->lastpreviewed_note->next;
 
 	if (pNote) {
 		sprintf(buf, "#%ld", pNote->vnum);
@@ -1797,7 +1942,7 @@ void do_next(USER_DATA * usr, char *argument) {
 		return;
 	}
 
-	send_to_user("No such message.\n\r", usr);
+	send_to_user("No such message.\r\n", usr);
 	return;
 }
 
@@ -1806,16 +1951,16 @@ void do_previous(USER_DATA * usr, char *argument) {
 	char buf[INPUT];
 
 	if (usr->pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
-	if (!usr->current_note) {
-		send_to_user("No such message.\n\r", usr);
+	if (!usr->lastpreviewed_note) {
+		send_to_user("No such message.\r\n", usr);
 		return;
 	}
 
-	pNote = usr->current_note->prev;
+	pNote = usr->lastpreviewed_note->prev;
 
 	if (pNote) {
 		sprintf(buf, "#%ld", pNote->vnum);
@@ -1823,7 +1968,7 @@ void do_previous(USER_DATA * usr, char *argument) {
 		return;
 	}
 
-	send_to_user("No such message.\n\r", usr);
+	send_to_user("No such message.\r\n", usr);
 	return;
 }
 
@@ -1832,12 +1977,12 @@ void do_readlast(USER_DATA * usr, char *argument) {
 	char buf[INPUT];
 
 	if (!usr->Validated) {
-		send_to_user("Unvalidated users can't read messages.\n\r", usr);
+		send_to_user("Unvalidated users can't read messages.\r\n", usr);
 		return;
 	}
 
 	if (usr->pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
@@ -1849,7 +1994,7 @@ void do_readlast(USER_DATA * usr, char *argument) {
 		return;
 	}
 
-	send_to_user("No such message.\n\r", usr);
+	send_to_user("No such message.\r\n", usr);
 	return;
 }
 
@@ -1868,7 +2013,7 @@ void do_search(USER_DATA * usr, char *argument) {
 	output = new_buf();
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
@@ -1878,7 +2023,7 @@ void do_search(USER_DATA * usr, char *argument) {
 	}
 
 	sprintf(buf, "#GThe following notes in #Y%s #Gcontain "
-		"the search string:#x\n\r", pBoard->long_name);
+		"the search string:#x\r\n", pBoard->long_name);
 	add_buf(output, buf);
 
 	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
@@ -1892,7 +2037,7 @@ void do_search(USER_DATA * usr, char *argument) {
 			continue;
 		}
 
-		sprintf(buf, "%3d #m#%-6ld %-12s  #G%-26s #y%s#x\n\r", vnum,
+		sprintf(buf, "%3d #m#%-6ld %-12s  #G%-26s #y%s#x\r\n", vnum,
 				pNote->vnum, colorize(usr, pNote->sender), pNote->subject,
 				pNote->date);
 		add_buf(output, buf);
@@ -1906,7 +2051,7 @@ void do_search(USER_DATA * usr, char *argument) {
 	}
 
 	free_buf(output);
-	print_to_user(usr, "#G%s#w doesn't contain the search string.\n\r",
+	print_to_user(usr, "#G%s#w doesn't contain the search string.\r\n",
 			pBoard->long_name);
 	return;
 }
@@ -1934,7 +2079,7 @@ bool read_next_new(USER_DATA *usr, BOARD_DATA *pBoard) {
 	if (!pNote) {
 		return FALSE;
 	}
-	sprintf(buf, "%d #m#%ld  %s  #y%s, #GSubject: #x%s#x\n\r\n\r", vnum,
+	sprintf(buf, "%d #m#%ld  %s  #y%s, #GSubject: #x%s#x\r\r\n\n", vnum,
 			pNote->vnum, colorize(usr, pNote->sender), pNote->date,
 			pNote->subject);
 	output = new_buf();
@@ -1945,6 +2090,7 @@ bool read_next_new(USER_DATA *usr, BOARD_DATA *pBoard) {
 	free_buf(output);
 	update_nread(usr, pNote, pBoard);
 	//usr->current_note = pNote;
+	usr->lastpreviewed_note = pNote;
 
 	sprintf(buf, "%s ", pBoard->short_name);
 	if (is_name_full(buf, usr->zap)) {
@@ -1979,15 +2125,18 @@ void do_skip(USER_DATA* usr, char* argument) {
 			continue;
 		}
 		if (unread_notes(usr, pBoard) > 0) {
-			sprintf(buf, "\n\rOkay; I have some new notes for you in "
-				"#C%s#x.\n\r\n\r", pBoard->long_name);
+			sprintf(buf, "\r\nOkay; I have some new notes for you in "
+				"#C%s#x.\r\r\n\n", pBoard->long_name);
 			send_to_user(buf, usr);
+			notify_forum_users(usr->pBoard, usr, FALSE);
 			usr->pBoard = pBoard;
+			notify_forum_users(usr->pBoard, usr, TRUE);
+			update_title(usr, pBoard);
 			return;
 		}
 	}
 
-	send_to_user("No new messages anywhere.\n\r", usr);
+	send_to_user("No new messages anywhere.\r\n", usr);
 	return;
 }
 
@@ -1997,7 +2146,7 @@ void do_new(USER_DATA *usr, char *argument) {
 	char buf[STRING];
 
 	if (!usr->Validated) {
-		send_to_user("Since you're not validated, you can't read messages\n\r",
+		send_to_user("Since you're not validated, you can't read messages\r\n",
 				usr);
 		return;
 	}
@@ -2012,27 +2161,27 @@ void do_new(USER_DATA *usr, char *argument) {
 		}
 		if (usr->gender == 0 && !strcmp(pBoard->long_name, "Womenonly") ) {
 			send_to_user(
-					"Male users are not allowed to read notes in this forum.\n\r",
+					"Male users are not allowed to read notes in this forum.\r\n",
 					usr);
 			return;
 		}
 
 		if (!pBoard || (pBoard->type == BOARD_SECRET && !IS_ADMIN(usr))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 
 		if (pBoard == board_lookup("chat", FALSE)) {
-			send_to_user("You can't read chat forum.\n\r", usr);
+			send_to_user("You can't read chat forum.\r\n", usr);
 			return;
 		}
 
 		if (pBoard->type == BOARD_GAME) {
-			send_to_user("Unknown command.\n\r", usr);
+			send_to_user("Unknown command.\r\n", usr);
 			return;
 		}
 		if (!read_next_new(usr, pBoard)) {
-			send_to_user("No new messages.\n\r", usr);
+			send_to_user("No new messages.\r\n", usr);
 		}
 		return;
 	} else {
@@ -2044,7 +2193,7 @@ void do_new(USER_DATA *usr, char *argument) {
 		// or if autojump is set, jump to the next one with new messages
 		if (!IS_TOGGLE(usr, TOGGLE_AUTOJUMP)) {
 			// no autojump, so we're done.
-			send_to_user("No new messages.\n\r", usr);
+			send_to_user("No new messages.\r\n", usr);
 			return;
 		}
 		pBoard = usr->pBoard->next;
@@ -2071,15 +2220,18 @@ void do_new(USER_DATA *usr, char *argument) {
 				continue;
 			}
 			if (unread_notes(usr, pBoard) > 0) {
-				sprintf(buf, "\n\r#YNo new messages left in #C%s#Y"
-					", jumping to #C%s#x\n\r\n\r", usr->pBoard->long_name,
+				sprintf(buf, "\r\n#YNo new messages left in #C%s#Y"
+					", jumping to #C%s#x\r\r\n\n", usr->pBoard->long_name,
 						pBoard->long_name);
 				send_to_user(buf, usr);
+				notify_forum_users(usr->pBoard, usr, FALSE);
 				usr->pBoard = pBoard;
+				notify_forum_users(usr->pBoard, usr, TRUE);
+				update_title(usr, pBoard);
 				return;
 			}
 		}
-		send_to_user("No new messages.\n\r", usr);
+		send_to_user("No new messages.\r\n", usr);
 	}
 
 	return;
@@ -2096,8 +2248,8 @@ bool is_kicked(USER_DATA * usr, BOARD_DATA * pBoard, bool fMessage) {
 		if (!str_cmp(pKick->name, usr->name)) {
 			if (remove > 0) {
 				if (fMessage) {
-					sprintf(buf, "You were kicked: #g%s#x\n\r"
-						"It will be removed in #c%s#x\n\r", pKick->reason,
+					sprintf(buf, "You were kicked: #g%s#x\r\n"
+						"It will be removed in #c%s#x\r\n", pKick->reason,
 							get_age(remove, FALSE));
 					send_to_user(buf, usr);
 				}
@@ -2106,7 +2258,7 @@ bool is_kicked(USER_DATA * usr, BOARD_DATA * pBoard, bool fMessage) {
 				UNLINK(pKick, pBoard->first_kick, pBoard->last_kick);
 				free_kick(pKick);
 				save_boards();
-				send_to_user("Your kick has expired.\n\r", usr);
+				send_to_user("Your kick has expired.\r\n", usr);
 				return FALSE;
 			}
 		}
@@ -2147,29 +2299,29 @@ void do_kick(USER_DATA * usr, char *argument) {
 		pBoard = moderator_board(usr);
 	} else {
 		if (!(pBoard = board_lookup(forumName, FALSE))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 	}
 
 	if (!is_user(userName)) {
-		send_to_user("No such user.\n\r", usr);
+		send_to_user("No such user.\r\n", usr);
 		return;
 	}
 
 	if (atoi(duration) < 1 || (!IS_ADMIN(usr) && atoi(duration) > 99)) {
-		send_to_user("Kick duration must be between 1 and 99 days.\n\r", usr);
+		send_to_user("Kick duration must be between 1 and 99 days.\r\n", usr);
 		return;
 	}
 
 	if (strlen(argument) > 40) {
-		send_to_user("Reason too long (Maximum 40 characters).\n\r", usr);
+		send_to_user("Reason too long (Maximum 40 characters).\r\n", usr);
 		return;
 	}
 
 	for (oKick = pBoard->first_kick; oKick; oKick = oKick->next) {
 		if (!str_cmp(oKick->name, userName)) {
-			sprintf(buf, "#Y%s#x is already kicked on #G%s#x.\n\r",
+			sprintf(buf, "#Y%s#x is already kicked on #G%s#x.\r\n",
 					oKick->name, pBoard->long_name);
 			send_to_user(buf, usr);
 			return;
@@ -2186,7 +2338,7 @@ void do_kick(USER_DATA * usr, char *argument) {
 	pKick->reason = str_dup(argument);
 	LINK(pKick, pBoard->first_kick, pBoard->last_kick);
 	save_boards();
-	sprintf(buf, "Ok, #Y%s#x has been kicked.\n\r", pKick->name);
+	sprintf(buf, "Ok, #Y%s#x has been kicked.\r\n", pKick->name);
 	send_to_user(buf, usr);
 	return;
 }
@@ -2216,14 +2368,14 @@ void do_unkick(USER_DATA * usr, char *argument) {
 		pBoard = moderator_board(usr);
 	} else {
 		if (!(pBoard = board_lookup(forumName, FALSE))) {
-			send_to_user("No such forum.\n\r", usr);
+			send_to_user("No such forum.\r\n", usr);
 			return;
 		}
 	}
 
 	for (pKick = pBoard->first_kick; pKick; pKick = pKick->next) {
 		if (!str_cmp(pKick->name, userName)) {
-			sprintf(buf, "Ok, #Y%s#x has been unkicked.\n\r", pKick->name);
+			sprintf(buf, "Ok, #Y%s#x has been unkicked.\r\n", pKick->name);
 			send_to_user(buf, usr);
 			UNLINK(pKick, pBoard->first_kick, pBoard->last_kick);
 			free_kick(pKick);
@@ -2232,7 +2384,7 @@ void do_unkick(USER_DATA * usr, char *argument) {
 		}
 	}
 
-	sprintf(buf, "#Y%s#R is not kicked.#x\n\r", capitalize(userName));
+	sprintf(buf, "#Y%s#R is not kicked.#x\r\n", capitalize(userName));
 	send_to_user(buf, usr);
 	return;
 }
@@ -2243,25 +2395,25 @@ void do_note(USER_DATA * usr, char *argument) {
 	pBoard = usr->pBoard;
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (pBoard->type == BOARD_ADMIN && !IS_ADMIN(usr)) {
-		send_to_user("Users are not allowed to write notes in this forum.\n\r",
+		send_to_user("Users are not allowed to write notes in this forum.\r\n",
 				usr);
 		return;
 	}
 	if (usr->gender == 0 && !strcmp(pBoard->long_name, "Womenonly") ) {
 		send_to_user(
-				"Male users are not allowed to write notes in this forum.\n\r",
+				"Male users are not allowed to write notes in this forum.\r\n",
 				usr);
 		return;
 	}
 
 	if (usr->gender == 1 && !strcmp(pBoard->long_name, "Menonly") ) {
 		send_to_user(
-				"Female users are not allowed to write notes in this forum.\n\r",
+				"Female users are not allowed to write notes in this forum.\r\n",
 				usr);
 		return;
 	}
@@ -2282,7 +2434,7 @@ void do_note(USER_DATA * usr, char *argument) {
 			pNote = pNote->prev;
 		}
 		if (i >= 5 && !IS_ADMIN(usr)) {
-			send_to_user("\n\r#RYou cannot leave more than #Y5#R notes in a row.\n\r\n\r", usr);
+			send_to_user("\r\n#RYou cannot leave more than #Y5#R notes in a row.\r\r\n\n", usr);
 			return;
 		}
 	}
@@ -2294,7 +2446,7 @@ void do_note(USER_DATA * usr, char *argument) {
 		smash_tilde(argument);
 
 		if (strlen(argument)> 26) {
-			send_to_user("Subject too long.\n\r", usr);
+			send_to_user("Subject too long.\r\n", usr);
 			return;
 		}
 
@@ -2313,18 +2465,18 @@ void do_anonnote(USER_DATA * usr, char *argument) {
 	pBoard = usr->pBoard;
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (pBoard->type == BOARD_ADMIN && !IS_ADMIN(usr)) {
-		send_to_user("Users are not allowed to write notes in this forum.\n\r",
+		send_to_user("Users are not allowed to write notes in this forum.\r\n",
 				usr);
 		return;
 	}
 
 	if (pBoard->type != BOARD_ANONYMOUS) {
-		send_to_user("Anonymous posting is not allowed in this forum.\n\r", usr);
+		send_to_user("Anonymous posting is not allowed in this forum.\r\n", usr);
 		return;
 	}
 
@@ -2338,7 +2490,7 @@ void do_anonnote(USER_DATA * usr, char *argument) {
 		smash_tilde(argument);
 
 		if (strlen(argument) > 26) {
-			send_to_user("Subject too long.\n\r", usr);
+			send_to_user("Subject too long.\r\n", usr);
 			return;
 		}
 
@@ -2358,13 +2510,13 @@ void do_sendclip(USER_DATA * usr, char *argument) {
 	FILE *fpMail;
 
 	if (!str_cmp(usr->sClip, "#UNSET")) {
-		send_to_user("No messages in your clipboard.\n\r", usr);
+		send_to_user("No messages in your clipboard.\r\n", usr);
 		return;
 	}
 
 	sprintf(name, "%s%s.clp", CLIP_DIR, capitalize(usr->name));
 	if (!(fpClip = fopen(name, "r"))) {
-		send_to_user("No messages in your clipboard.\n\r", usr);
+		send_to_user("No messages in your clipboard.\r\n", usr);
 		bbs_bug("Do_sendclip: Could not open to read %s", name);
 		return;
 	}
@@ -2373,11 +2525,11 @@ void do_sendclip(USER_DATA * usr, char *argument) {
 	sprintf(buf, "/usr/bin/sendmail -t < %s", name);
 	if (!(fpMail = popen(buf, "r"))) {
 		bbs_bug("Do_sendclip: Could not open to read %s", buf);
-		send_to_user("ERROR: Could not execute mail command.\n\r", usr);
+		send_to_user("ERROR: Could not execute mail command.\r\n", usr);
 		return;
 	}
 	pclose(fpMail);
-	send_to_user("Sending.\n\r", usr);
+	send_to_user("Sending.\r\n", usr);
 	return;
 }
 
@@ -2387,12 +2539,12 @@ void do_showclip(USER_DATA * usr, char *argument) {
 	buf[0] = '\0';
 
 	if (!str_cmp(usr->sClip, "#UNSET")) {
-		send_to_user("No messages in your clipboard.\n\r", usr);
+		send_to_user("No messages in your clipboard.\r\n", usr);
 		return;
 	} else {
-		sprintf(buf, "*** Begin ***\n\r%s\n\r*** End of clipboard ***\n\r",
+		sprintf(buf, "*** Begin ***\r\n%s\r\n*** End of clipboard ***\r\n",
 				usr->sClip);
-		page_to_user_bw(buf, usr);
+		page_to_user_c(buf, usr, FALSE);
 		return;
 	}
 }
@@ -2413,12 +2565,12 @@ void do_clip(USER_DATA * usr, char *argument) {
 	pBoard = usr->pBoard;
 
 	if (pBoard->type == BOARD_GAME) {
-		send_to_user("Unknown command.\n\r", usr);
+		send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (arg[0] == '\0') {
-		send_to_user("Clip which note?\n\r", usr);
+		send_to_user("Clip which note?\r\n", usr);
 		return;
 	}
 
@@ -2428,7 +2580,7 @@ void do_clip(USER_DATA * usr, char *argument) {
 	}
 
 	if (!is_number(arg_num)) {
-		send_to_user("Clip which note?\n\r", usr);
+		send_to_user("Clip which note?\r\n", usr);
 		return;
 	}
 
@@ -2436,18 +2588,18 @@ void do_clip(USER_DATA * usr, char *argument) {
 
 	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
 		if ((++vnum == anum && !fNumber) || (fNumber && anum == pNote->vnum)) {
-			fclose(fpReserve);
+			//fclose(fpReserve);
 			sprintf(buf, "%s%s.clp", CLIP_DIR, capitalize(usr->name));
 			if (!(fpClip = fopen(buf, "w"))) {
 				bbs_bug("Do_clip: Could not open to write %s", buf);
 				send_to_user(
-						"ERROR: Could not open to save your clip file.\n\r",
+						"ERROR: Could not open to save your clip file.\r\n",
 						usr);
-				fpReserve = fopen(NULL_FILE, "r");
+				//fpReserve = fopen(NULL_FILE, "r");
 				return;
 			}
 
-			sprintf(buf, "%d #%ld  %s  %s, Subject: %s\n\r\n\r%s", vnum,
+			sprintf(buf, "%d #%ld  %s  %s, Subject: %s\r\n\r\n%s", vnum,
 					pNote->vnum, pNote->sender, pNote->date, pNote->subject,
 					pNote->text);
 			if (usr->sClip)
@@ -2463,17 +2615,17 @@ void do_clip(USER_DATA * usr, char *argument) {
 					config.bbs_name, config.bbs_host, config.bbs_port,
 					config.bbs_email);
 			fclose(fpClip);
-			fpReserve = fopen(NULL_FILE, "r");
-			send_to_user("Clipped.\n\r", usr);
+			//fpReserve = fopen(NULL_FILE, "r");
+			send_to_user("Clipped.\r\n", usr);
 			return;
 		}
 	}
 
-	send_to_user("No such message.\n\r", usr);
+	send_to_user("No such message.\r\n", usr);
 	return;
 }
 
-void do_Who(USER_DATA * usr, char *argument) {
+void do_Who_old(USER_DATA * usr, char *argument) {
 	char buf[STRING];
 	char cBuf[STRING];
 	char for_buf[INPUT];
@@ -2493,7 +2645,7 @@ void do_Who(USER_DATA * usr, char *argument) {
 	if (arg[0] == '\0')
 		noArg = TRUE;
 	else if (!pBoard) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
@@ -2523,20 +2675,20 @@ void do_Who(USER_DATA * usr, char *argument) {
 		USR(d)->pBoard->long_name);
 		strcat(cBuf, buf);
 		if (++col % 3 == 0)
-			strcat(cBuf, "\n\r");
+			strcat(cBuf, "\r\n");
 	}
 
 	if (col % 3 != 0)
-		strcat(cBuf, "\n\r");
+		strcat(cBuf, "\r\n");
 
 	if (nMatch < 1 && !noArg) {
-		print_to_user(usr, "There is no one in %s forum.\n\r",
+		print_to_user(usr, "There is no one in %s forum.\r\n",
 				pBoard->long_name);
 		return;
 	}
 
-	sprintf(buf, "#Y%s BBS Who List (#GTotal #Y%d #Guser%s#Y):\n\r"
-		"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\r", config.bbs_name,
+	sprintf(buf, "#Y%s BBS Who List (#GTotal #Y%d #Guser%s#Y):\r\n"
+		"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\r\n", config.bbs_name,
 			nMatch, nMatch > 1 ? "s" : "");
 	add_buf(output, buf);
 	add_buf(output, cBuf);
@@ -2570,7 +2722,7 @@ void edit_info_answer(USER_DATA * usr, char *argument) {
 			break;
 
 		default:
-			send_to_user("Aborted.\n\r", usr);
+			send_to_user("Aborted.\r\n", usr);
 			EDIT_MODE(usr) = EDITOR_NONE;
 			break;
 	}
@@ -2589,7 +2741,7 @@ void do_foruminfo(USER_DATA * usr, char *argument) {
 	}
 
 	if (!pBoard) {
-		send_to_user("ERROR: No such forum.\n\r", usr);
+		send_to_user("ERROR: No such forum.\r\n", usr);
 		bbs_bug("Do_foruminfo: Null pBoard");
 		return;
 	}
@@ -2597,9 +2749,9 @@ void do_foruminfo(USER_DATA * usr, char *argument) {
 	if (str_cmp(pBoard->info, "None")) {
 		output = new_buf();
 
-		add_buf(output, "Currently forum info is:\n\r");
+		add_buf(output, "Currently forum info is:\r\n");
 		add_buf(output, pBoard->info);
-		page_to_user_bw(buf_string(output), usr);
+		page_to_user(buf_string(output), usr);
 		free_buf(output);
 		EDIT_MODE(usr) = EDITOR_INFO_ANSWER;
 		return;
@@ -2627,29 +2779,29 @@ void do_stats(USER_DATA * usr, char *argument) {
 	}
 
 	if (!pBoard) {
-		send_to_user("No such forum.\n\r", usr);
+		send_to_user("No such forum.\r\n", usr);
 		return;
 	}
 
 	output = new_buf();
 
-	sprintf(buf, "#WForum name  : #G%s#x\n\r"
-		"#WKicked users:#x\n\r", pBoard->long_name);
+	sprintf(buf, "#WForum name  : #G%s#x\r\n"
+		"#WKicked users:#x\r\n", pBoard->long_name);
 	add_buf(output, buf);
 
 	for (pKick = pBoard->first_kick; pKick; pKick = pKick->next) {
 		remove = (int) pKick->duration - current_time;
 
 		if (pKick->duration >= current_time) {
-			sprintf(buf, "  #c%s#x for #D%s#x, with reason: #b%s#x\n\r",
+			sprintf(buf, "  #c%s#x for #D%s#x, with reason: #b%s#x\r\n",
 					pKick->name, get_age(remove, FALSE), pKick->reason);
 			add_buf(output, buf);
 		}
 	}
 
-	sprintf(buf, "#WTotal notes :#x %d\n\r"
-		"#WFirst note  :#x #m%s#x, #g%s #Y[#y%s#Y]#x\n\r"
-		"#WLast note   :#x #m%s#x, #g%s #Y[#y%s#Y]#x\n\r", total_notes(usr,
+	sprintf(buf, "#WTotal notes :#x %d\r\n"
+		"#WFirst note  :#x #m%s#x, #g%s #Y[#y%s#Y]#x\r\n"
+		"#WLast note   :#x #m%s#x, #g%s #Y[#y%s#Y]#x\r\n", total_notes(usr,
 			pBoard), pBoard->first_note ? pBoard->first_note->sender : "None",
 			pBoard->first_note ? pBoard->first_note->subject : "",
 			pBoard->first_note ? pBoard->first_note->date : "",
@@ -2682,7 +2834,7 @@ void edit_note_subject(USER_DATA * usr, char *argument) {
 		EDIT_MODE(usr) = EDITOR_NONE;
 		return;
 	} else if (strlen(argument) > 26) {
-		send_to_user("Subject too long.\n\r", usr);
+		send_to_user("Subject too long.\r\n", usr);
 		return;
 	}
 

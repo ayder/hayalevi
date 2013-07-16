@@ -219,6 +219,7 @@ Text
 *       read            sendclip        showclip        zap             *
 *       look            readall         anonnote        search          *
 *       readlast        previous        next            fnotify         *
+*       readinterval                                                    *
 *************************************************************************
 * Other commands:                                                       *
 *       alias           bug             cls             enemy           *
@@ -472,6 +473,16 @@ Name       : read
 Synopsis   : read <number of note>
 
 This command is used to read a specific number of note.
+~
+End
+Keyword readinterval~
+Level 0
+Text
+Name       : readinterval
+Synopsis   : readinterval <number of beginning note> <number of ending note>
+
+This command is used to read specific numbers of notes between two note 
+numbers.
 ~
 End
 Keyword sendclip~

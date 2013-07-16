@@ -79,7 +79,7 @@ void substitute_alias(DESC_DATA *d, char *argument) {
 }
 
 void do_alia(USER_DATA *usr, char *argument) {
-	send_to_user("I'm sorry, alias must be entered in full.\n\r", usr);
+	send_to_user("I'm sorry, alias must be entered in full.\r\n", usr);
 	return;
 }
 
@@ -94,31 +94,31 @@ void do_alias(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (usr->alias[0] == NULL) {
-			send_to_user("You have no aliases defined.\n\r", usr);
+			send_to_user("You have no aliases defined.\r\n", usr);
 			return;
 		}
 
-		send_to_user("Your current aliases are:\n\r", usr);
+		send_to_user("Your current aliases are:\r\n", usr);
 
 		for (pos = 0; pos < MAX_ALIAS; pos++) {
 			if (usr->alias[pos] == NULL || usr->alias_sub[pos] == NULL)
 				break;
 
-			sprintf(buf, "    %s:  %s\n\r", usr->alias[pos],
+			sprintf(buf, "    %s:  %s\r\n", usr->alias[pos],
 					usr->alias_sub[pos]);
-			send_to_user_bw(buf, usr);
+			send_to_user_c(buf, usr, FALSE);
 		}
 		return;
 	}
 
 	if (!str_prefix("unalias", arg) || !str_cmp("alias", arg)) {
-		send_to_user("Sorry, that word is reserved.\n\r", usr);
+		send_to_user("Sorry, that word is reserved.\r\n", usr);
 		return;
 	}
 
 	if (strchr(arg, ' ') || strchr(arg, '"') || strchr(arg, '\'')) {
 		send_to_user("The word to be aliased should not contain a space, "
-			"a tick or a double-quote.\n\r", usr);
+			"a tick or a double-quote.\r\n", usr);
 		return;
 	}
 
@@ -128,14 +128,14 @@ void do_alias(USER_DATA *usr, char *argument) {
 				break;
 
 			if (!str_cmp(arg, usr->alias[pos])) {
-				sprintf(buf, "%s aliases to '%s'.\n\r", usr->alias[pos],
+				sprintf(buf, "%s aliases to '%s'.\r\n", usr->alias[pos],
 						usr->alias_sub[pos]);
-				send_to_user_bw(buf, usr);
+				send_to_user_c(buf, usr, FALSE);
 				return;
 			}
 		}
 
-		send_to_user("That alias is not defined.\n\r", usr);
+		send_to_user("That alias is not defined.\r\n", usr);
 		return;
 	}
 
@@ -146,21 +146,21 @@ void do_alias(USER_DATA *usr, char *argument) {
 		if (!str_cmp(arg, usr->alias[pos])) {
 			free_string(usr->alias_sub[pos]);
 			usr->alias_sub[pos] = str_dup(argument);
-			sprintf(buf, "%s is now realiased to '%s'.\n\r", arg, argument);
-			send_to_user_bw(buf, usr);
+			sprintf(buf, "%s is now realiased to '%s'.\r\n", arg, argument);
+			send_to_user_c(buf, usr, FALSE);
 			return;
 		}
 	}
 
 	if (pos >= MAX_ALIAS) {
-		send_to_user("Sorry, you have reached the alias limit.\n\r", usr);
+		send_to_user("Sorry, you have reached the alias limit.\r\n", usr);
 		return;
 	}
 
 	usr->alias[pos] = str_dup(arg);
 	usr->alias_sub[pos] = str_dup(argument);
-	sprintf(buf, "%s is now aliased to '%s'.\n\r", arg, argument);
-	send_to_user_bw(buf, usr);
+	sprintf(buf, "%s is now aliased to '%s'.\r\n", arg, argument);
+	send_to_user_c(buf, usr, FALSE);
 }
 
 void do_unalias(USER_DATA *usr, char *argument) {
@@ -171,7 +171,7 @@ void do_unalias(USER_DATA *usr, char *argument) {
 	argument = one_argument(argument, arg);
 
 	if (arg[0] == '\0') {
-		send_to_user("Unalias what?\n\r", usr);
+		send_to_user("Unalias what?\r\n", usr);
 		return;
 	}
 
@@ -188,7 +188,7 @@ void do_unalias(USER_DATA *usr, char *argument) {
 		}
 
 		if (!str_cmp(arg, usr->alias[pos])) {
-			send_to_user("Alias removed.\n\r", usr);
+			send_to_user("Alias removed.\r\n", usr);
 			free_string(usr->alias[pos]);
 			free_string(usr->alias_sub[pos]);
 			usr->alias[pos] = NULL;
@@ -198,7 +198,7 @@ void do_unalias(USER_DATA *usr, char *argument) {
 	}
 
 	if (!found)
-		send_to_user("No alias of that name to remove.\n\r", usr);
+		send_to_user("No alias of that name to remove.\r\n", usr);
 }
 
 char *time_str(time_t last_time) {
@@ -276,7 +276,7 @@ void fread_finger(USER_DATA *usr, FILE *fp) {
 				}
 				if (!str_cmp(word, "End")) {
 
-					sprintf(buf, "#c*%s* %s%-12s #W(#x%s#W)#x\n\r",
+					sprintf(buf, "#c*%s* %s%-12s #W(#x%s#W)#x\r\n",
 							!Validated ? " NEW " : level == ADMIN ? "ADMIN"
 									: "BBS", is_friend(usr, name) ? "#C"
 									: is_notify(usr, name) ? "#G" : is_enemy(
@@ -287,21 +287,21 @@ void fread_finger(USER_DATA *usr, FILE *fp) {
 					if (!IS_SET(fHide, HIDE_REALNAME) || IS_ADMIN(usr)) {
 						sprintf(
 								buf,
-								"#c*BBS* #WReal Name    : #x%s%s\n\r",
+								"#c*BBS* #WReal Name    : #x%s%s\r\n",
 								real_name,
 								IS_ADMIN(usr) ? gender == 0 ? " (Male)" : " (Female)" : "");
 						send_to_user(buf, usr);
 					}
 
 					if (!IS_SET(fHide, HIDE_EMAIL) || IS_ADMIN(usr)) {
-						sprintf(buf, "#c*BBS* #WE-mail       : #x%s\n\r", email);
+						sprintf(buf, "#c*BBS* #WE-mail       : #x%s\r\n", email);
 						send_to_user(buf, usr);
 					}
 
 					if (!str_cmp(alt_mail, "NONE"))
 						send_to_user("", usr);
 					else if (!IS_SET(fHide, HIDE_ALTEMAIL) || IS_ADMIN(usr)) {
-						sprintf(buf, "#c*BBS* #WAlt. E-mail  : #x%s\n\r",
+						sprintf(buf, "#c*BBS* #WAlt. E-mail  : #x%s\r\n",
 								alt_mail);
 						send_to_user(buf, usr);
 					}
@@ -309,38 +309,38 @@ void fread_finger(USER_DATA *usr, FILE *fp) {
 					if (!str_cmp(url, "NONE"))
 						send_to_user("", usr);
 					else if (!IS_SET(fHide, HIDE_HOMEPAGE) || IS_ADMIN(usr)) {
-						sprintf(buf, "#c*BBS* #WHomepage Url : #x%s\n\r", url);
+						sprintf(buf, "#c*BBS* #WHomepage Url : #x%s\r\n", url);
 						send_to_user(buf, usr);
 					}
 
 					if (!str_cmp(icq, "NONE"))
 						send_to_user("", usr);
 					else if (!IS_SET(fHide, HIDE_ICQ) || IS_ADMIN(usr)) {
-						sprintf(buf, "#c*BBS* #WICQ Number   : #x%s\n\r", icq);
+						sprintf(buf, "#c*BBS* #WICQ Number   : #x%s\r\n", icq);
 						send_to_user(buf, usr);
 					}
 
 					/*
-					 sprintf(buf, "#gUser has e#GX#gpress messages %s#x\n\r",
+					 sprintf(buf, "#gUser has e#GX#gpress messages %s#x\r\n",
 					 IS_SET(fToggle, TOGGLE_XING) ? "#WENABLED" : "#RDISABLED");
 					 send_to_user(buf, usr); Baxter */
 
 					sprintf(
 							buf,
-							"#cTotal login: #C%d#c, and have left #C%d #cnotes.#x\n\r",
+							"#cTotal login: #C%d#c, and have left #C%d #cnotes.#x\r\n",
 							t_login, t_note);
 					send_to_user(buf, usr);
-					sprintf(buf, "#GSpent #g%s #Gonline.#x\n\r", get_age(age, 
+					sprintf(buf, "#GSpent #g%s #Gonline.#x\r\n", get_age(age, 
 					FALSE));
 					send_to_user(buf, usr);
 					sprintf(buf,
-							"#yLast on: #Y(%s) #yto #Y(%s) #yfrom #c%s#x\n\r",
+							"#yLast on: #Y(%s) #yto #Y(%s) #yfrom #c%s#x\r\n",
 							time_str(last_logon), time_str(last_logoff), 
 							IS_ADMIN(usr) ? host_name : host_small);
 					send_to_user(buf, usr);
 					finger_mail(usr, name);
 					if (strlen(plan) > 0) {
-						print_to_user_bw(usr, "%s\n\r", plan);
+						print_to_user_bw(usr, "%s\r\n", plan);
 					}
 
 					if (name)
@@ -495,13 +495,13 @@ void do_finger(USER_DATA *usr, char *argument) {
 
 	if ((!(fUser = get_user(arg))) || (fUser && IS_TOGGLE(fUser, TOGGLE_INVIS))) {
 		if (!is_user(arg)) {
-			send_to_user("No such user.\n\r", usr);
+			send_to_user("No such user.\r\n", usr);
 			return;
 		}
 
 		sprintf(buf, "%s%s", USER_DIR, capitalize(arg));
 		if (!(fp = fopen(buf, "r"))) {
-			send_to_user("No such user.\n\r", usr);
+			send_to_user("No such user.\r\n", usr);
 			return;
 		}
 
@@ -511,7 +511,7 @@ void do_finger(USER_DATA *usr, char *argument) {
 	}
 
 	print_to_user(usr,
-			"#c*%s* %s%-12s #W(#x%s#W)\n\r#c*BBS* #WLocation     : #c%s#W\n\r",
+			"#c*%s* %s%-12s #W(#x%s#x#W)\r\n#c*BBS* #WLocation     : #c%s#W\r\n",
 			!fUser->Validated ? " NEW " : IS_ADMIN(fUser) ? "ADMIN" : "BBS",
 			is_friend(usr, fUser->name) ? "#C"
 					: is_notify(usr, fUser->name) ? "#G" : is_enemy(usr,
@@ -519,58 +519,60 @@ void do_finger(USER_DATA *usr, char *argument) {
 			fUser->title, fUser->pBoard->long_name);
 
 	if (!IS_HIDE(fUser, HIDE_REALNAME) || IS_ADMIN(usr))
-		print_to_user(usr, "#c*BBS* #WReal Name    : #x%s%s%s\n\r",
+		print_to_user(usr, "#c*BBS* #WReal Name    : #x%s%s%s\r\n",
 				fUser->real_name, IS_ADMIN(usr) ? IS_MALE(fUser) ? " (Male)"
 				: " (Female)" : "", IS_ADMIN(usr) && IS_HIDE(fUser, HIDE_REALNAME)
 				? " (Hidden)" : "");
 
 	if (!IS_HIDE(fUser, HIDE_EMAIL) || IS_ADMIN(usr))
-		print_to_user(usr, "#c*BBS* #WE-Mail       : #x%s%s\n\r", fUser->email, 
+		print_to_user(usr, "#c*BBS* #WE-Mail       : #x%s%s\r\n", fUser->email, 
 		IS_ADMIN(usr) && IS_HIDE(fUser, HIDE_EMAIL)
 		? " (Hidden)" : "");
 
 	if (!str_cmp(fUser->alt_email, "NONE"))
 		send_to_user("", usr);
 	else if (!IS_HIDE(fUser, HIDE_ALTEMAIL) || IS_ADMIN(usr))
-		print_to_user(usr, "#c*BBS* #WAlt. E-Mail  : #x%s%s\n\r",
+		print_to_user(usr, "#c*BBS* #WAlt. E-Mail  : #x%s%s\r\n",
 				fUser->alt_email, IS_ADMIN(usr) && IS_HIDE(fUser, HIDE_ALTEMAIL)
 				? " (Hidden)" : "");
 
 	if (!str_cmp(fUser->home_url, "NONE"))
 		send_to_user("", usr);
 	else if (!IS_HIDE(fUser, HIDE_HOMEPAGE) || IS_ADMIN(usr))
-		print_to_user(usr, "#c*BBS* #WHomepage Url : #x%s%s\n\r",
+		print_to_user(usr, "#c*BBS* #WHomepage Url : #x%s%s\r\n",
 				fUser->home_url, IS_ADMIN(usr) && IS_HIDE(fUser, HIDE_HOMEPAGE)
 				? " (Hidden)" : "");
 
 	if (!str_cmp(fUser->icquin, "NONE"))
 		send_to_user("", usr);
 	else if (!IS_HIDE(fUser, HIDE_ICQ) || IS_ADMIN(usr))
-		print_to_user(usr, "#c*BBS* #WICQ Number   : #x%s%s\n\r",
+		print_to_user(usr, "#c*BBS* #WICQ Number   : #x%s%s\r\n",
 				fUser->icquin, IS_ADMIN(usr) && IS_HIDE(fUser, HIDE_ICQ)
 				? " (Hidden)" : "");
 
 	if (IS_ADMIN(usr)) {
-		print_to_user(usr, "#gUser has e#GX#gpress messages %s #W(#wAdmin Only#W)#x\n\r",
+		print_to_user(usr, "#gUser has e#GX#gpress messages %s #W(#wAdmin Only#W)#x\r\n",
 			IS_TOGGLE(fUser, TOGGLE_XING) ? "#WENABLED" : "#RDISABLED");
 	}
 
 	if (IS_ADMIN(usr)) {
 		print_to_user(usr, "#cTotal login: #C%d#c, "
-			"and have left #C%d #cnotes. #W(#wAdmin Only#W)#x\n\r",
+			"and have left #C%d #cnotes. #W(#wAdmin Only#W)#x\r\n",
 				fUser->total_login, fUser->total_note);
 	}
-	print_to_user(usr, "#GAge: #g%s#x\n\r", get_age((fUser->used
+	print_to_user(usr, "#GAge: #g%s#x\r\n", get_age((fUser->used
 			+ (int) (current_time - fUser->age)), FALSE));
+	
+	print_to_user(usr, "#GCharSet: #g%s#x\r\n", fUser->clientCharset);
 
-	print_to_user(usr, "#yONLINE SINCE: #Y%s #yfrom: #c%s#x\n\r",
+	print_to_user(usr, "#yONLINE SINCE: #Y%s #yfrom: #c%s#x\r\n",
 			time_str(fUser->last_logon), IS_ADMIN(usr) ? fUser->host_name
 			: fUser->host_small);
 
 	finger_mail(usr, fUser->name);
 
 	if (strlen(fUser->plan) > 0)
-		print_to_user(usr, "%s#x\n\r", fUser->plan);
+		print_to_user(usr, "%s#x\r\n", fUser->plan);
 
 	return;
 }
@@ -583,43 +585,43 @@ void friend_remove(USER_DATA *usr, char *argument, bool fAll) {
 	one_argument(argument, arg);
 
 	if (fAll) {
-		send_to_user("Flushing the your friend list.\n\r", usr);
+		send_to_user("Flushing the your friend list.\r\n", usr);
 
 		for (pos = 0; pos < MAX_FRIEND; pos++) {
-			if (usr->friend[pos] == NULL)
+			if (usr->friends[pos] == NULL)
 				break;
 
-			if (usr->friend[pos])
-				free_string(usr->friend[pos]);
+			if (usr->friends[pos])
+				free_string(usr->friends[pos]);
 			if (usr->friend_com[pos])
 				free_string(usr->friend_com[pos]);
-			usr->friend[pos] = NULL;
+			usr->friends[pos] = NULL;
 			usr->friend_com[pos] = NULL;
 		}
 
-		send_to_user("Done.\n\r", usr);
+		send_to_user("Done.\r\n", usr);
 		return;
 	}
 
 	for (pos = 0; pos < MAX_FRIEND; pos++) {
-		if (usr->friend[pos] == NULL)
+		if (usr->friends[pos] == NULL)
 			break;
 
 		if (found) {
-			usr->friend[pos-1] = usr->friend[pos];
+			usr->friends[pos-1] = usr->friends[pos];
 			usr->friend_com[pos-1] = usr->friend_com[pos];
-			usr->friend[pos] = NULL;
+			usr->friends[pos] = NULL;
 			usr->friend_com[pos] = NULL;
 			continue;
 		}
 
-		if (!str_cmp(arg, usr->friend[pos])) {
-			print_to_user(usr, "Friend #C%s#x removed.\n\r", usr->friend[pos]);
-			if (usr->friend[pos])
-				free_string(usr->friend[pos]);
+		if (!str_cmp(arg, usr->friends[pos])) {
+			print_to_user(usr, "Friend #C%s#x removed.\r\n", usr->friends[pos]);
+			if (usr->friends[pos])
+				free_string(usr->friends[pos]);
 			if (usr->friend_com[pos])
 				free_string(usr->friend_com[pos]);
-			usr->friend[pos] = NULL;
+			usr->friends[pos] = NULL;
 			usr->friend_com[pos] = NULL;
 			found = TRUE;
 		}
@@ -627,7 +629,7 @@ void friend_remove(USER_DATA *usr, char *argument, bool fAll) {
 
 	if (!found)
 		print_to_user(usr,
-				"You don't have an entry for #C%s#x in your friend list.\n\r",
+				"You don't have an entry for #C%s#x in your friend list.\r\n",
 				capitalize(argument));
 
 	return;
@@ -637,12 +639,12 @@ void friend_nouser(USER_DATA *usr) {
 	int pos;
 
 	for (pos = 0; pos < MAX_FRIEND; pos++) {
-		if (usr->friend[pos] == NULL)
+		if (usr->friends[pos] == NULL)
 			break;
 
-		if (!is_user(usr->friend[pos])) {
-			print_to_user(usr, "No such user #C%s#x.\n\r", usr->friend[pos]);
-			friend_remove(usr, usr->friend[pos], FALSE);
+		if (!is_user(usr->friends[pos])) {
+			print_to_user(usr, "No such user #C%s#x.\r\n", usr->friends[pos]);
+			friend_remove(usr, usr->friends[pos], FALSE);
 		}
 	}
 }
@@ -663,30 +665,30 @@ void do_friend(USER_DATA *usr, char *argument) {
 	strcpy(cbuf, "");
 
 	if (arg[0] == '\0') {
-		if (usr->friend[0] == NULL) {
-			send_to_user("You don't have any entry in your friend list.\n\r",
+		if (usr->friends[0] == NULL) {
+			send_to_user("You don't have any entry in your friend list.\r\n",
 					usr);
 			return;
 		}
 
 		for (pos = 0; pos < MAX_FRIEND; pos++) {
-			if (usr->friend[pos] == NULL)
+			if (usr->friends[pos] == NULL)
 				break;
 
 			friend_nouser(usr);
 
-			if (usr->friend[pos] == NULL)
+			if (usr->friends[pos] == NULL)
 				break;
 
-			sprintf(buf, "#C%-12s #W: #Y%s\n\r", usr->friend[pos], str_cmp(
+			sprintf(buf, "#C%-12s #W: #Y%s\r\n", usr->friends[pos], str_cmp(
 					usr->friend_com[pos], "[none]") ? usr->friend_com[pos] : "");
 			strcat(cbuf, buf);
 			vnum++;
 		}
 
-		sprintf(dbuf, "#GYou friend list (#Y%d#G):\n\r"
-			"Nickname       Comment\n\r"
-			"--------       -------\n\r", vnum);
+		sprintf(dbuf, "#GYou friend list (#Y%d#G):\r\n"
+			"Nickname       Comment\r\n"
+			"--------       -------\r\n", vnum);
 		add_buf(output, dbuf);
 		add_buf(output, cbuf);
 		add_buf(output, "#x");
@@ -696,19 +698,19 @@ void do_friend(USER_DATA *usr, char *argument) {
 	}
 
 	for (pos = 0; pos < MAX_FRIEND; pos++) {
-		if (usr->friend[pos] == NULL)
+		if (usr->friends[pos] == NULL)
 			break;
 
 		friend_nouser(usr);
 
-		if (!str_cmp(arg, usr->friend[pos])) {
-			print_to_user(usr, "Modifying information for #C%s#x.\n\r"
-				"Removing: #C%s#x\n\rNew friend: #C%s#x\n\r", usr->friend[pos],
-					usr->friend[pos], usr->friend[pos]);
+		if (!str_cmp(arg, usr->friends[pos])) {
+			print_to_user(usr, "Modifying information for #C%s#x.\r\n"
+				"Removing: #C%s#x\r\nNew friend: #C%s#x\r\n", usr->friends[pos],
+					usr->friends[pos], usr->friends[pos]);
 
 			if (strlen(argument) > MAX_COMMENT) {
 				send_to_user("Maximum comment length can only be 60 "
-					"characters.\n\r", usr);
+					"characters.\r\n", usr);
 				return;
 			}
 
@@ -737,7 +739,7 @@ void do_friend(USER_DATA *usr, char *argument) {
 
 	if (!is_user(arg)) {
 		print_to_user(usr,
-				"That's creative, but user #C%s#x does not exist.\n\r",
+				"That's creative, but user #C%s#x does not exist.\r\n",
 				capitalize(arg));
 		return;
 	}
@@ -745,12 +747,12 @@ void do_friend(USER_DATA *usr, char *argument) {
 	friend_nouser(usr);
 
 	if (pos >= MAX_FRIEND) {
-		send_to_user("Sorry, you have reached the friend limit.\n\r", usr);
+		send_to_user("Sorry, you have reached the friend limit.\r\n", usr);
 		return;
 	}
 
 	if (strlen(argument) > MAX_COMMENT) {
-		send_to_user("Maximum comment length can only be 60 characters.\n\r",
+		send_to_user("Maximum comment length can only be 60 characters.\r\n",
 				usr);
 		return;
 	}
@@ -761,12 +763,12 @@ void do_friend(USER_DATA *usr, char *argument) {
 	if (is_enemy(usr, arg))
 		enemy_remove(usr, arg, FALSE);
 
-	usr->friend[pos] = str_dup(capitalize(arg));
+	usr->friends[pos] = str_dup(capitalize(arg));
 	if (argument[0] == '\0')
 		usr->friend_com[pos] = str_dup("[none]");
 	else
 		usr->friend_com[pos] = str_dup(argument);
-	print_to_user(usr, "New friend: #C%s#x\n\r", capitalize(arg));
+	print_to_user(usr, "New friend: #C%s#x\r\n", capitalize(arg));
 	return;
 }
 
@@ -778,7 +780,7 @@ void notify_remove(USER_DATA *usr, char *argument, bool fAll) {
 	one_argument(argument, arg);
 
 	if (fAll) {
-		send_to_user("Flushing the your notify list.\n\r", usr);
+		send_to_user("Flushing the your notify list.\r\n", usr);
 
 		for (pos = 0; pos < MAX_FRIEND; pos++) {
 			if (usr->notify[pos] == NULL)
@@ -792,7 +794,7 @@ void notify_remove(USER_DATA *usr, char *argument, bool fAll) {
 			usr->notify_com[pos] = NULL;
 		}
 
-		send_to_user("Done.\n\r", usr);
+		send_to_user("Done.\r\n", usr);
 		return;
 	}
 
@@ -809,7 +811,7 @@ void notify_remove(USER_DATA *usr, char *argument, bool fAll) {
 		}
 
 		if (!str_cmp(arg, usr->notify[pos])) {
-			print_to_user(usr, "Notify #G%s#x removed.\n\r", usr->notify[pos]);
+			print_to_user(usr, "Notify #G%s#x removed.\r\n", usr->notify[pos]);
 			if (usr->notify[pos])
 				free_string(usr->notify[pos]);
 			if (usr->notify_com[pos])
@@ -822,7 +824,7 @@ void notify_remove(USER_DATA *usr, char *argument, bool fAll) {
 
 	if (!found)
 		print_to_user(usr,
-				"You don't have an entry for #G%s#x in your notify list.\n\r",
+				"You don't have an entry for #G%s#x in your notify list.\r\n",
 				capitalize(argument));
 
 	return;
@@ -836,7 +838,7 @@ void notify_nouser(USER_DATA *usr) {
 			break;
 
 		if (!is_user(usr->notify[pos])) {
-			print_to_user(usr, "No such user #G%s#x.\n\r", usr->notify[pos]);
+			print_to_user(usr, "No such user #G%s#x.\r\n", usr->notify[pos]);
 			notify_remove(usr, usr->notify[pos], FALSE);
 		}
 	}
@@ -859,7 +861,7 @@ void do_notify(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (usr->notify[0] == NULL) {
-			send_to_user("You don't have any entry in your notify list.\n\r",
+			send_to_user("You don't have any entry in your notify list.\r\n",
 					usr);
 			return;
 		}
@@ -873,15 +875,15 @@ void do_notify(USER_DATA *usr, char *argument) {
 			if (usr->notify[pos] == NULL)
 				break;
 
-			sprintf(buf, "#G%-12s #W: #Y%s\n\r", usr->notify[pos], str_cmp(
+			sprintf(buf, "#G%-12s #W: #Y%s\r\n", usr->notify[pos], str_cmp(
 					usr->notify_com[pos], "[none]") ? usr->notify_com[pos] : "");
 			strcat(cbuf, buf);
 			vnum++;
 		}
 
-		sprintf(dbuf, "#GYou notify list (#Y%d#G):\n\r"
-			"Nickname       Comment\n\r"
-			"--------       -------\n\r", vnum);
+		sprintf(dbuf, "#GYou notify list (#Y%d#G):\r\n"
+			"Nickname       Comment\r\n"
+			"--------       -------\r\n", vnum);
 		add_buf(output, dbuf);
 		add_buf(output, cbuf);
 		add_buf(output, "#x");
@@ -897,13 +899,13 @@ void do_notify(USER_DATA *usr, char *argument) {
 		notify_nouser(usr);
 
 		if (!str_cmp(arg, usr->notify[pos])) {
-			print_to_user(usr, "Modifying information for #G%s#x.\n\r"
-				"Removing: #G%s#x\n\rNew notify: #G%s#x\n\r", usr->notify[pos],
+			print_to_user(usr, "Modifying information for #G%s#x.\r\n"
+				"Removing: #G%s#x\r\nNew notify: #G%s#x\r\n", usr->notify[pos],
 					usr->notify[pos], usr->notify[pos]);
 
 			if (strlen(argument) > MAX_COMMENT) {
 				send_to_user("Maximum comment length can only be 60 "
-					"characters.\n\r", usr);
+					"characters.\r\n", usr);
 				return;
 			}
 
@@ -932,7 +934,7 @@ void do_notify(USER_DATA *usr, char *argument) {
 
 	if (!is_user(arg)) {
 		print_to_user(usr,
-				"That's creative, but user #G%s#x does not exist.\n\r",
+				"That's creative, but user #G%s#x does not exist.\r\n",
 				capitalize(arg));
 		return;
 	}
@@ -940,12 +942,12 @@ void do_notify(USER_DATA *usr, char *argument) {
 	notify_nouser(usr);
 
 	if (pos >= MAX_FRIEND) {
-		send_to_user("Sorry, you have reached the notify limit.\n\r", usr);
+		send_to_user("Sorry, you have reached the notify limit.\r\n", usr);
 		return;
 	}
 
 	if (strlen(argument) > MAX_COMMENT) {
-		send_to_user("Maximum comment length can only be 60 characters.\n\r",
+		send_to_user("Maximum comment length can only be 60 characters.\r\n",
 				usr);
 		return;
 	}
@@ -961,7 +963,7 @@ void do_notify(USER_DATA *usr, char *argument) {
 		usr->notify_com[pos] = str_dup("[none]");
 	else
 		usr->notify_com[pos] = str_dup(argument);
-	print_to_user(usr, "New notify: #G%s#x\n\r", capitalize(arg));
+	print_to_user(usr, "New notify: #G%s#x\r\n", capitalize(arg));
 	return;
 }
 
@@ -973,7 +975,7 @@ void enemy_remove(USER_DATA *usr, char *argument, bool fAll) {
 	one_argument(argument, arg);
 
 	if (fAll) {
-		send_to_user("Flushing the your enemy list.\n\r", usr);
+		send_to_user("Flushing the your enemy list.\r\n", usr);
 
 		for (pos = 0; pos < MAX_FRIEND; pos++) {
 			if (usr->enemy[pos] == NULL)
@@ -987,7 +989,7 @@ void enemy_remove(USER_DATA *usr, char *argument, bool fAll) {
 			usr->enemy_com[pos] = NULL;
 		}
 
-		send_to_user("Done.\n\r", usr);
+		send_to_user("Done.\r\n", usr);
 		return;
 	}
 
@@ -1004,7 +1006,7 @@ void enemy_remove(USER_DATA *usr, char *argument, bool fAll) {
 		}
 
 		if (!str_cmp(arg, usr->enemy[pos])) {
-			print_to_user(usr, "Enemy #R%s#x removed.\n\r", usr->enemy[pos]);
+			print_to_user(usr, "Enemy #R%s#x removed.\r\n", usr->enemy[pos]);
 			if (usr->enemy[pos])
 				free_string(usr->enemy[pos]);
 			if (usr->enemy_com[pos])
@@ -1017,7 +1019,7 @@ void enemy_remove(USER_DATA *usr, char *argument, bool fAll) {
 
 	if (!found)
 		print_to_user(usr,
-				"You don't have an entry for #R%s#x in your enemy list.\n\r",
+				"You don't have an entry for #R%s#x in your enemy list.\r\n",
 				capitalize(argument));
 
 	return;
@@ -1031,7 +1033,7 @@ void enemy_nouser(USER_DATA *usr) {
 			break;
 
 		if (!is_user(usr->enemy[pos])) {
-			print_to_user(usr, "No such user #R%s#x.\n\r", usr->enemy[pos]);
+			print_to_user(usr, "No such user #R%s#x.\r\n", usr->enemy[pos]);
 			enemy_remove(usr, usr->enemy[pos], FALSE);
 		}
 	}
@@ -1054,7 +1056,7 @@ void do_enemy(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (usr->enemy[0] == NULL) {
-			send_to_user("You don't have any entry in your enemy list.\n\r",
+			send_to_user("You don't have any entry in your enemy list.\r\n",
 					usr);
 			return;
 		}
@@ -1068,15 +1070,15 @@ void do_enemy(USER_DATA *usr, char *argument) {
 			if (usr->enemy[pos] == NULL)
 				break;
 
-			sprintf(buf, "#R%-12s #W: #Y%s\n\r", usr->enemy[pos], str_cmp(
+			sprintf(buf, "#R%-12s #W: #Y%s\r\n", usr->enemy[pos], str_cmp(
 					usr->enemy_com[pos], "[none]") ? usr->enemy_com[pos] : "");
 			strcat(cbuf, buf);
 			vnum++;
 		}
 
-		sprintf(dbuf, "#GYou enemy list (#Y%d#G):\n\r"
-			"Nickname       Comment\n\r"
-			"--------       -------\n\r", vnum);
+		sprintf(dbuf, "#GYou enemy list (#Y%d#G):\r\n"
+			"Nickname       Comment\r\n"
+			"--------       -------\r\n", vnum);
 		add_buf(output, dbuf);
 		add_buf(output, cbuf);
 		add_buf(output, "#x");
@@ -1092,13 +1094,13 @@ void do_enemy(USER_DATA *usr, char *argument) {
 		enemy_nouser(usr);
 
 		if (!str_cmp(arg, usr->enemy[pos])) {
-			print_to_user(usr, "Modifying information for #R%s#x.\n\r"
-				"Removing: #R%s#x\n\rNew enemy: #R%s#x\n\r", usr->enemy[pos],
+			print_to_user(usr, "Modifying information for #R%s#x.\r\n"
+				"Removing: #R%s#x\r\nNew enemy: #R%s#x\r\n", usr->enemy[pos],
 					usr->enemy[pos], usr->enemy[pos]);
 
 			if (strlen(argument) > MAX_COMMENT) {
 				send_to_user("Maximum comment length can only be 60 "
-					"characters.\n\r", usr);
+					"characters.\r\n", usr);
 				return;
 			}
 
@@ -1127,7 +1129,7 @@ void do_enemy(USER_DATA *usr, char *argument) {
 
 	if (!is_user(arg)) {
 		print_to_user(usr,
-				"That's creative, but user #R%s#x does not exist.\n\r",
+				"That's creative, but user #R%s#x does not exist.\r\n",
 				capitalize(arg));
 		return;
 	}
@@ -1135,12 +1137,12 @@ void do_enemy(USER_DATA *usr, char *argument) {
 	enemy_nouser(usr);
 
 	if (pos >= MAX_FRIEND) {
-		send_to_user("Sorry, you have reached the enemy limit.\n\r", usr);
+		send_to_user("Sorry, you have reached the enemy limit.\r\n", usr);
 		return;
 	}
 
 	if (strlen(argument) > MAX_COMMENT) {
-		send_to_user("Maximum comment length can only be 60 characters.\n\r",
+		send_to_user("Maximum comment length can only be 60 characters.\r\n",
 				usr);
 		return;
 	}
@@ -1156,7 +1158,7 @@ void do_enemy(USER_DATA *usr, char *argument) {
 		usr->enemy_com[pos] = str_dup("[none]");
 	else
 		usr->enemy_com[pos] = str_dup(argument);
-	print_to_user(usr, "New enemy: #R%s#x\n\r", capitalize(arg));
+	print_to_user(usr, "New enemy: #R%s#x\r\n", capitalize(arg));
 	return;
 }
 
@@ -1168,7 +1170,7 @@ void ignore_remove(USER_DATA *usr, char *argument, bool fAll) {
 	one_argument(argument, arg);
 
 	if (fAll) {
-		send_to_user("Flushing the your ignore list.\n\r", usr);
+		send_to_user("Flushing the your ignore list.\r\n", usr);
 
 		for (pos = 0; pos < MAX_FRIEND; pos++) {
 			if (usr->ignore[pos] == NULL)
@@ -1182,7 +1184,7 @@ void ignore_remove(USER_DATA *usr, char *argument, bool fAll) {
 			usr->ignore_com[pos] = NULL;
 		}
 
-		send_to_user("Done.\n\r", usr);
+		send_to_user("Done.\r\n", usr);
 		return;
 	}
 
@@ -1199,7 +1201,7 @@ void ignore_remove(USER_DATA *usr, char *argument, bool fAll) {
 		}
 
 		if (!str_cmp(arg, usr->ignore[pos])) {
-			print_to_user(usr, "Ignore #Y%s#x removed.\n\r", usr->ignore[pos]);
+			print_to_user(usr, "Ignore #Y%s#x removed.\r\n", usr->ignore[pos]);
 			if (usr->ignore[pos])
 				free_string(usr->ignore[pos]);
 			if (usr->ignore_com[pos])
@@ -1212,7 +1214,7 @@ void ignore_remove(USER_DATA *usr, char *argument, bool fAll) {
 
 	if (!found)
 		print_to_user(usr,
-				"You don't have an entry for #Y%s#x in your ignore list.\n\r",
+				"You don't have an entry for #Y%s#x in your ignore list.\r\n",
 				capitalize(argument));
 
 	return;
@@ -1226,7 +1228,7 @@ void ignore_nouser(USER_DATA *usr) {
 			break;
 
 		if (!is_user(usr->ignore[pos])) {
-			print_to_user(usr, "No such user #Y%s#x.\n\r", usr->ignore[pos]);
+			print_to_user(usr, "No such user #Y%s#x.\r\n", usr->ignore[pos]);
 			friend_remove(usr, usr->ignore[pos], FALSE);
 		}
 	}
@@ -1249,7 +1251,7 @@ void do_ignore(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (usr->ignore[0] == NULL) {
-			send_to_user("You don't have any entry in your ignore list.\n\r",
+			send_to_user("You don't have any entry in your ignore list.\r\n",
 					usr);
 			return;
 		}
@@ -1260,15 +1262,15 @@ void do_ignore(USER_DATA *usr, char *argument) {
 
 			ignore_nouser(usr);
 
-			sprintf(buf, "#Y%-12s #W: #Y%s\n\r", usr->ignore[pos], str_cmp(
+			sprintf(buf, "#Y%-12s #W: #Y%s\r\n", usr->ignore[pos], str_cmp(
 					usr->ignore_com[pos], "[none]") ? usr->ignore_com[pos] : "");
 			strcat(cbuf, buf);
 			vnum++;
 		}
 
-		sprintf(dbuf, "#GYou ignore list (#Y%d#G):\n\r"
-			"Nickname       Comment\n\r"
-			"--------       -------\n\r", vnum);
+		sprintf(dbuf, "#GYou ignore list (#Y%d#G):\r\n"
+			"Nickname       Comment\r\n"
+			"--------       -------\r\n", vnum);
 		add_buf(output, dbuf);
 		add_buf(output, cbuf);
 		add_buf(output, "#x");
@@ -1284,13 +1286,13 @@ void do_ignore(USER_DATA *usr, char *argument) {
 		ignore_nouser(usr);
 
 		if (!str_cmp(arg, usr->ignore[pos])) {
-			print_to_user(usr, "Modifying information for #Y%s#x.\n\r"
-				"Removing: #Y%s#x\n\rNew ignore: #Y%s#x\n\r", usr->ignore[pos],
+			print_to_user(usr, "Modifying information for #Y%s#x.\r\n"
+				"Removing: #Y%s#x\r\nNew ignore: #Y%s#x\r\n", usr->ignore[pos],
 					usr->ignore[pos], usr->ignore[pos]);
 
 			if (strlen(argument) > MAX_COMMENT) {
 				send_to_user("Maximum comment length can only be 60 "
-					"characters.\n\r", usr);
+					"characters.\r\n", usr);
 				return;
 			}
 
@@ -1319,7 +1321,7 @@ void do_ignore(USER_DATA *usr, char *argument) {
 
 	if (!is_user(arg)) {
 		print_to_user(usr,
-				"That's creative, but user #Y%s#x does not exist.\n\r",
+				"That's creative, but user #Y%s#x does not exist.\r\n",
 				capitalize(arg));
 		return;
 	}
@@ -1327,12 +1329,12 @@ void do_ignore(USER_DATA *usr, char *argument) {
 	ignore_nouser(usr);
 
 	if (pos >= MAX_FRIEND) {
-		send_to_user("Sorry, you have reached the ignore limit.\n\r", usr);
+		send_to_user("Sorry, you have reached the ignore limit.\r\n", usr);
 		return;
 	}
 
 	if (strlen(argument) > MAX_COMMENT) {
-		send_to_user("Maximum comment length can only be 60 characters.\n\r",
+		send_to_user("Maximum comment length can only be 60 characters.\r\n",
 				usr);
 		return;
 	}
@@ -1342,18 +1344,18 @@ void do_ignore(USER_DATA *usr, char *argument) {
 		usr->ignore_com[pos] = str_dup("[none]");
 	else
 		usr->ignore_com[pos] = str_dup(argument);
-	print_to_user(usr, "New ignore: #Y%s#x\n\r", capitalize(arg));
+	print_to_user(usr, "New ignore: #Y%s#x\r\n", capitalize(arg));
 	return;
 }
 
 bool is_friend(USER_DATA *usr, char *name) {
-	int friend;
+	int ifriend;
 
-	for (friend = 0; friend < MAX_FRIEND; friend++) {
-		if (usr->friend[friend] == NULL)
+	for (ifriend = 0; ifriend < MAX_FRIEND; ifriend++) {
+		if (usr->friends[ifriend] == NULL)
 			break;
 
-		if (!str_cmp(name, usr->friend[friend]))
+		if (!str_cmp(name, usr->friends[ifriend]))
 			return TRUE;
 	}
 
@@ -1421,7 +1423,7 @@ void cmd_chat_talk(USER_DATA *usr, char *argument) {
 	for (d = desc_list; d; d = d->next) {
 		if (USR(d) && d->login == CON_LOGIN
 		&& USR(d)->pBoard == board_lookup("chat", FALSE)) {
-			sprintf(buf, "%s%s#x: %s#x\n\r", 
+			sprintf(buf, "%s%s#x: %s#x\r\n", 
 			USR(d) == usr ? "#W" :
 			is_friend(USR(d), usr->name) ? "#C" :
 			is_notify(USR(d), usr->name) ? "#G" :
@@ -1444,7 +1446,7 @@ void cmd_chat_emote(USER_DATA *usr, char *argument) {
 	for (d = desc_list; d; d = d->next) {
 		if (USR(d) && d->login == CON_LOGIN
 		&& USR(d)->pBoard == board_lookup("chat", FALSE)) {
-			sprintf(buf, "%s%s#x %s#x\n\r", 
+			sprintf(buf, "%s%s#x %s#x\r\n", 
 			USR(d) == usr ? "#W" :
 			is_friend(USR(d), usr->name) ? "#C" :
 			is_notify(USR(d), usr->name) ? "#G" :
@@ -1469,7 +1471,7 @@ void cmd_chat_look(USER_DATA *usr) {
 	DESC_DATA *d;
 	char buf[STRING];
 
-	strcpy(buf, "Users in the chat room are:\n\r\n\r");
+	strcpy(buf, "Users in the chat room are:\r\n\r\n");
 
 	for (d = desc_list; d; d = d->next) {
 		if (USR(d) && d->login == CON_LOGIN
@@ -1479,7 +1481,7 @@ void cmd_chat_look(USER_DATA *usr) {
 		}
 	}
 
-	strcat(buf, "\n\r\n\r");
+	strcat(buf, "\r\n\r\n");
 	send_to_user(buf, usr);
 	return;
 }

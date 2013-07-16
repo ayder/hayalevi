@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "bbs.h"
 
@@ -230,6 +231,8 @@ void clear_user(USER_DATA *usr) {
 	usr->version = 1;
 	usr->total_login = 0;
 	usr->total_note = 0;
+	//usr->clientCharset = str_dup("UTF-8");
+	usr->clientCharset = str_dup("ASCII");
 
 	if (IS_TOGGLE(usr, TOGGLE_INVIS))
 		REM_TOGGLE(usr, TOGGLE_INVIS);
@@ -351,7 +354,7 @@ void save_user(USER_DATA *usr) {
 	BOARD_DATA *pBoard;
 	FILE *fp;
 	int alias;
-	int friend;
+	int iFriend;
 	int notify;
 	int enemy;
 	int ignore;
@@ -369,7 +372,7 @@ void save_user(USER_DATA *usr) {
 		return;
 	}
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	sprintf(strsave, "%s%s", USER_DIR, capitalize(usr->name));
 	if ((fp = fopen(TEMP_FILE, "w")) == NULL) {
 		bbs_bug("Save_user: Fopen");
@@ -392,6 +395,7 @@ void save_user(USER_DATA *usr) {
 		fprintf(fp, "ICQ  %s~\n", usr->icquin);
 		fprintf(fp, "Imsg %s~\n", usr->idlemsg);
 		fprintf(fp, "Titl %s~\n", usr->title);
+		fprintf(fp, "ChSet %s~\n", usr->clientCharset);
 		fprintf(fp, "Gend %d\n", usr->gender);
 		fprintf(fp, "Levl %d\n", usr->level);
 		fprintf(fp, "Zap  %s~\n", usr->zap);
@@ -410,12 +414,12 @@ void save_user(USER_DATA *usr) {
 					usr->alias_sub[alias]);
 		}
 
-		for (friend = 0; friend < MAX_FRIEND; friend++) {
-			if (usr->friend[friend] == NULL)
+		for (iFriend = 0; iFriend < MAX_FRIEND; iFriend++) {
+			if (usr->friends[iFriend] == NULL)
 				break;
 
-			fprintf(fp, "Friend %s %s~\n", usr->friend[friend],
-					usr->friend_com[friend]);
+			fprintf(fp, "Friend %s %s~\n", usr->friends[iFriend],
+					usr->friend_com[iFriend]);
 		}
 
 		for (notify = 0; notify < MAX_FRIEND; notify++) {
@@ -450,7 +454,7 @@ void save_user(USER_DATA *usr) {
 	}
 	fclose(fp);
 	rename(TEMP_FILE, strsave);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 }
 
@@ -486,7 +490,7 @@ bool load_user(DESC_DATA *d, char *name) {
 	clear_user(usr);
 	found = FALSE;
 
-	fclose(fpReserve);
+	//fclose(fpReserve);
 	sprintf(strsave, "%s%s", USER_DIR, capitalize(name));
 	if ((fp = fopen(strsave, "r")) != NULL) {
 		found = TRUE;
@@ -525,6 +529,11 @@ bool load_user(DESC_DATA *d, char *name) {
 				}
 				break;
 
+			case 'C':
+				KEY("ChSet", usr->clientCharset, fread_string(fp))
+				;
+				break;
+
 			case 'E':
 				KEYS("Emai", usr->email, fread_string(fp))
 				;
@@ -542,6 +551,9 @@ bool load_user(DESC_DATA *d, char *name) {
 					break;
 				}
 				if (!str_cmp(word, "End")) {
+          fclose(fp);
+          if (!usr->clientCharset) 
+            usr->clientCharset = str_dup("ASCII");
 					return found;
 				}
 				break;
@@ -556,7 +568,7 @@ bool load_user(DESC_DATA *d, char *name) {
 						break;
 					}
 
-					usr->friend[cFriend] = str_dup(fread_word(fp));
+					usr->friends[cFriend] = str_dup(fread_word(fp));
 					usr->friend_com[cFriend] = fread_string(fp);
 					cFriend++;
 					fMatch = TRUE;
@@ -702,8 +714,10 @@ bool load_user(DESC_DATA *d, char *name) {
 		}
 		fclose(fp);
 	}
+	if (!usr->clientCharset) 
+	  usr->clientCharset = str_dup("ASCII");
 
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 
 	return found;
 }
@@ -730,8 +744,8 @@ void check_fnotify(USER_DATA *sender, BOARD_DATA *pBoard) {
 				pBoard->short_name, usr->fnotify) && IS_TOGGLE(usr, TOGGLE_INFO)) {
 			sprintf(
 					buf,
-					"\n\r%s#W**** #yMessage from: #GNotify Daemon #yat #c%s #W****#x\n\r"
-						"] #G%s#x has left a new note on #G%s#x forum.\n\r\n\r", 
+					"\r\n%s#W**** #yMessage from: #GNotify Daemon #yat #c%s #W****#x\r\n"
+						"] #G%s#x has left a new note on #G%s#x forum.\r\n\r\n", 
 					IS_TOGGLE(usr, TOGGLE_BEEP) ? "\007" : "", sender->xing_time,
 					sender->name, pBoard->long_name);
 
@@ -759,25 +773,25 @@ void check_notify(USER_DATA *usr, USER_DATA *notify, bool fLogin) {
 	if (is_friend(usr, notify->name) || is_notify(usr, notify->name)) {
 		if (IS_TOGGLE(usr, TOGGLE_INFO)) {
 			sprintf(buf1,
-					"\n\r%s#W**** #yMessage from: %s #yat #c%s #W****#x\n\r", 
+					"\r\n%s#W**** #yMessage from: %s #yat #c%s #W****#x\r\n", 
 					IS_TOGGLE(usr, TOGGLE_BEEP) ? "\007" : "",
 					fNotify ? "#GNotify Daemon" : "#CFriend Daemon",
 					notify->xing_time);
 			if (fLogin) {
 				if (fNotify)
-					sprintf(buf2, "] #G%s#x has logged into %s.\n\r\n\r",
+					sprintf(buf2, "] #G%s#x has logged into %s.\r\n\r\n",
 							notify->name, config.bbs_name);
 				else
 					sprintf(buf2,
-							"] Your friend #C%s#x has logged into %s.\n\r\n\r",
+							"] Your friend #C%s#x has logged into %s.\r\n\r\n",
 							notify->name, config.bbs_name);
 			} else {
 				if (fNotify)
-					sprintf(buf2, "] #G%s#x has logged out.\n\r\n\r",
+					sprintf(buf2, "] #G%s#x has logged out.\r\n\r\n",
 							notify->name);
 				else
 					sprintf(buf2,
-							"] Your friend #C%s#x has logged out.\n\r\n\r",
+							"] Your friend #C%s#x has logged out.\r\n\r\n",
 							notify->name);
 			}
 
@@ -820,12 +834,12 @@ void user_update(void) {
 
 		/*
 		 if (++usr->timer == 5 && !IS_ADMIN(usr))
-		 print_to_user(usr, "%sHey! You had better act more alive.\n\r",
+		 print_to_user(usr, "%sHey! You had better act more alive.\r\n",
 		 IS_TOGGLE(usr, TOGGLE_BEEP) ? "\007" : "");
 
 		 if (usr->timer >= 10 && !IS_ADMIN(usr))
 		 {
-		 print_to_user(usr, "%sYou are idle too long.\n\r\n\r",
+		 print_to_user(usr, "%sYou are idle too long.\r\n\r\n",
 		 IS_TOGGLE(usr, TOGGLE_BEEP) ? "\007" : "");
 		 do_quit_org(usr, "", FALSE);
 		 }
@@ -856,7 +870,7 @@ void shutdown_update(void) {
 	case 15:
 	case 20:
 	case 30:
-		sprintf(buf, "\007BBS Driver: Shutting down in %d minutes.\n\r",
+		sprintf(buf, "\007BBS Driver: Shutting down in %d minutes.\r\n",
 				shutdown_tick);
 		break;
 	}
@@ -909,15 +923,15 @@ void memory_other(USER_DATA *usr) {
 	for (fusr = user_free; fusr != NULL; fusr = fusr->next)
 		count2++;
 
-	sprintf(buf, "User : %4d (%8d bytes), %2d free (%d bytes)\n\r", count1,
+	sprintf(buf, "User : %4d (%8d bytes), %2d free (%d bytes)\r\n", count1,
 			count1 * (sizeof(*fusr)), count2, count2 * (sizeof(*fusr)));
 	send_to_user(buf, usr);
 
-	sprintf(buf, "Mesg : %4d -- %d bytes\n\r", count_msg, count_msg
+	sprintf(buf, "Mesg : %4d -- %d bytes\r\n", count_msg, count_msg
 			* (sizeof(*fMessage)));
 	send_to_user(buf, usr);
 
-	sprintf(buf, "Mail : %4d -- %d bytes\n\r", count_mail, count_mail
+	sprintf(buf, "Mail : %4d -- %d bytes\r\n", count_mail, count_mail
 			* (sizeof(*fMail)));
 	send_to_user(buf, usr);
 
@@ -929,7 +943,7 @@ void memory_other(USER_DATA *usr) {
 	for (fd = desc_free; fd != NULL; fd = fd->next)
 		count2++;
 
-	sprintf(buf, "Desc : %4d (%8d bytes), %2d free (%d bytes)\n\r", count1,
+	sprintf(buf, "Desc : %4d (%8d bytes), %2d free (%d bytes)\r\n", count1,
 			count1 * (sizeof(*fd)), count2, count2 * (sizeof(*fd)));
 	send_to_user(buf, usr);
 	return;
@@ -966,7 +980,7 @@ long get_age_from_file(const char * usrName) {
 	FILE * fp;
 	long age = -1;
 	sprintf(usrFile,"%s%s", USER_DIR, capitalize(usrName)); // user profile dosyasi
-	fp = fopen(usrFile, "r"); // dosyayi aç
+	fp = fopen(usrFile, "r"); // dosyayi ac
 	if (NULL != fp) {
 		if (fread(fileBuf, sizeof(char), sizeof(fileBuf), fp) > 0) {  // oku
 			pDest = strstr(fileBuf, "\nAge");  // "\nAge" ara

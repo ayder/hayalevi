@@ -19,6 +19,14 @@
  * ROM license in the file 'doc/rom.license' and
  * Smaug license in the file 'doc/smaug.license'
  */
+#ifndef __BBS_H__
+#define __BBS_H__
+
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if !defined(FALSE)
 #define FALSE	0
@@ -29,7 +37,11 @@
 #endif
 
 typedef short int sh_int;
+
+#ifndef __cplusplus
 typedef unsigned char bool;
+#endif
+
 typedef unsigned long int iptr;
 /* Crypt problem fix for BSD/Redhat (glibc) systems */
 char * crypt(const char *key, const char *salt);
@@ -49,6 +61,7 @@ typedef struct kick_data KICK_DATA;
 typedef struct banish_data BANISH_DATA;
 typedef struct validate_data VALIDATE_DATA;
 typedef struct message_data MESSAGE_DATA;
+typedef struct feeling_data FEELING_DATA;
 typedef void DO_FUN(USER_DATA *usr, char *argument);
 
 /*
@@ -108,37 +121,42 @@ typedef void DO_FUN(USER_DATA *usr, char *argument);
 /*
  * Ascii conversions.
  */
-#define A			1
-#define B			2
-#define C			4
-#define D			8
-#define E			16
-#define F			32
-#define G			64
-#define H			128
-#define I			256
-#define J			1024
-#define K			2048
+#define A			(1 <<  0)
+#define B			(1 <<  1)
+#define C			(1 <<  2)
+#define D			(1 <<  3)
+#define E			(1 <<  4)
+#define F			(1 <<  5)
+#define G			(1 <<  6)
+#define H			(1 <<  7)
+#define I			(1 <<  8)
+#define J			(1 <<  9)
+#define K			(1 << 10)
+#define L			(1 << 11)
+#define M			(1 << 12)
+#define N			(1 << 13)
+
 
 /*
  * Color defines.
  */
-#define COLOR_NORMAL		"[0;0;37m"
-#define COLOR_RED			"[0;31m"
-#define COLOR_GREEN			"[0;32m"
-#define COLOR_YELLOW		"[0;33m"
-#define COLOR_BLUE			"[0;34m"
-#define COLOR_MAGENTA		"[0;35m"
-#define COLOR_CYAN			"[0;36m"
-#define COLOR_RED_BOLD		"[1;31m"
-#define COLOR_GREEN_BOLD	"[1;32m"
-#define COLOR_YELLOW_BOLD	"[1;33m"
-#define COLOR_BLUE_BOLD		"[1;34m"
-#define COLOR_MAGENTA_BOLD	"[1;35m"
-#define COLOR_CYAN_BOLD		"[1;36m"
-#define COLOR_WHITE			"[1;37m"
-#define COLOR_DARK			"[1;30m"
-#define COLOR_RED_BACKGROUND	"[1;41m"
+#define COLOR_NORMAL		"\033[0;0;37m"
+#define COLOR_RED			"\033[0;31m"
+#define COLOR_GREEN			"\033[0;32m"
+#define COLOR_YELLOW		"\033[0;33m"
+#define COLOR_BLUE			"\033[0;34m"
+#define COLOR_MAGENTA		"\033[0;35m"
+#define COLOR_CYAN			"\033[0;36m"
+#define COLOR_RED_BOLD		"\033[1;31m"
+#define COLOR_GREEN_BOLD	"\033[1;32m"
+#define COLOR_YELLOW_BOLD	"\033[1;33m"
+#define COLOR_BLUE_BOLD		"\033[1;34m"
+#define COLOR_MAGENTA_BOLD	"\033[1;35m"
+#define COLOR_CYAN_BOLD		"\033[1;36m"
+#define COLOR_WHITE			"\033[1;37m"
+#define COLOR_DARK			"\033[1;30m"
+#define COLOR_RED_BACKGROUND	"\033[1;41m"
+#define COLOR_UNDERLINE		"\033[4m"
 
 /*
  * Hide defines.
@@ -163,6 +181,9 @@ typedef void DO_FUN(USER_DATA *usr, char *argument);
 #define TOGGLE_TURK		(I)
 #define TOGGLE_INVIS	(J)
 #define TOGGLE_AUTOJUMP	(K)
+#define TOGGLE_HELP	(L)
+#define TOGGLE_MORE	(M)
+#define TOGGLE_SAY	(N)
 
 #define BBS_NEWLOCK		(A)
 #define BBS_ADMLOCK		(B)
@@ -259,6 +280,7 @@ struct user_data {
 	BOARD_DATA * pBoard;
 	NOTE_DATA * pNote;
 	NOTE_DATA * current_note;
+	NOTE_DATA * lastpreviewed_note;
 	BUFFER * pBuffer;
 	MESSAGE_DATA * pMsgFirst;
 	MESSAGE_DATA * pMsgLast;
@@ -277,7 +299,7 @@ struct user_data {
 	char * idlemsg;
 	char * home_url;
 	char * icquin;
-	char * friend [MAX_FRIEND];
+	char * friends [MAX_FRIEND];
 	char * friend_com [MAX_FRIEND];
 	char * enemy [MAX_FRIEND];
 	char * enemy_com [MAX_FRIEND];
@@ -315,6 +337,7 @@ struct user_data {
 	char * zap;
 	char * fnotify;
 	char * sClip;
+	char * clientCharset;
 	time_t last_note [100];
 	long fToggle;
 	long fHide;
@@ -408,6 +431,14 @@ struct message_data {
 	char * message;
 };
 
+struct feeling_data {
+	FEELING_DATA* next;
+	FEELING_DATA* prev;
+	char* text;
+	char* keyword;
+	char* name;
+};
+
 struct help_data {
 	HELP_DATA * next;
 	HELP_DATA * prev;
@@ -460,6 +491,8 @@ extern VALIDATE_DATA * first_validate;
 extern VALIDATE_DATA * last_validate;
 extern BOARD_DATA * first_board;
 extern BOARD_DATA * last_board;
+extern FEELING_DATA* first_feeling;
+extern FEELING_DATA* last_feeling;
 extern CONFIG config;
 extern char log_buf [];
 extern char str_empty [1];
@@ -467,7 +500,7 @@ extern time_t current_time;
 extern time_t boot_time_t;
 extern char boot_time [STRING_LENGTH];
 extern int last_note_vnum;
-extern FILE * fpReserve;
+//extern FILE * fpReserve;
 extern bool fBootDbase;
 extern char * greeting1;
 extern char * greeting2;
@@ -518,13 +551,14 @@ void print_to_user(USER_DATA *usr, char *format, ...);
 void print_to_user_bw(USER_DATA *usr, char *format, ...);
 void syntax(const char *txt, USER_DATA *usr);
 void send_to_user(const char *txt, USER_DATA *usr);
-void page_to_user_bw(const char *txt, USER_DATA *usr);
-void msg_to_user(const char *txt, USER_DATA *usr);
+void send_to_user_c(const char *txt, USER_DATA *usr, bool showColors);
 void page_to_user(const char *txt, USER_DATA *usr);
-void show_string(struct desc_data *d, char *input, bool fMx);
-int color(char type, char *string);
+void page_to_user_c(const char *txt, USER_DATA *usr, bool showColors);
+void show_string(struct desc_data *d, char *input);
+int color(const char* type, char *string);
 void get_small_host(USER_DATA *usr);
 char* colorize(USER_DATA* usr, char* to);
+void do_charset(USER_DATA *usr, char *argument);
 
 /* command.c */
 void process_command(USER_DATA *usr, char *argument);
@@ -574,6 +608,7 @@ bool str_suffix(const char *astr, const char *bstr);
 char * capitalize(const char *str);
 char * one_argument(char *argument, char *arg_first);
 char * one_argument_two(char *argument, char *arg_first);
+char * second_argument(char *argument, char *arg_second);
 int number_argument(char *argument, char *arg);
 BUFFER *new_buf(void);
 BUFFER *new_buf_size(int size);
@@ -591,12 +626,15 @@ int number_range(int from, int to);
 int count_files(char *path);
 void copyover_recover(void);
 void tail_chain(void);
+void load_feelings(void);
+void load_helps(void);
+
 
 /* editor.c */
 void string_edit(USER_DATA *usr, char **pString);
 void string_append(USER_DATA *usr, char **pString);
 void string_add(USER_DATA *usr, char *argument);
-char * string_replace(char *orig, char *old, char *new);
+char * string_replace(char *orig, char *oldStr, char *newStr);
 char * format_string(char *oldstring);
 char * first_arg(char *argument, char *arg_first, bool fCase);
 
@@ -617,7 +655,7 @@ void edit_xing_receipt(USER_DATA *usr, char *argument);
 void edit_xing_reply(USER_DATA *usr, char *argument);
 void edit_feeling_receipt(USER_DATA *usr, char *argument);
 void edit_feeling(USER_DATA *usr, char *argument);
-void send_feeling(USER_DATA *usr, int type);
+void send_feeling(USER_DATA *usr, const char* feeling);
 
 /* resolve.c */
 void create_resolve(DESC_DATA *d, long ip, sh_int port);
@@ -653,8 +691,17 @@ void free_buffer(USER_DATA *pUser);
 bool is_turkish(USER_DATA *usr);
 long get_age_from_file(const char * usrName); // ProgMan
 
+/* dict.c */
 void init_dict(void);
 void done_dict(void);
+
+/* extras.cpp */
+void createExchangeThread(void);
+void finishExchangeThread(void);
+const char * checkCharset(const char * name);
+char * iconv_strndup(const char * str, size_t n,
+   const char * toCharset, const char * fromCharset, int *outLen);
+
 
 /*
  * Buffer valid states.
@@ -722,6 +769,7 @@ void done_dict(void);
 #define BANISH_FILE		"data/banish.db"
 #define VALIDATE_FILE		"data/validate.db"
 #define BOARD_FILE		"data/boards.db"
+#define FEELING_FILE		"data/feelings.db"
 
 #define DBFILE_DE2TR    "dict/de2tr.db3"
 #define DBFILE_TR2DE    "dict/tr2de.db3"
@@ -756,6 +804,7 @@ CMD_DO_FUN( do_enemy );
 CMD_DO_FUN( do_feeling );
 CMD_DO_FUN( do_finger );
 CMD_DO_FUN( do_fnotify );
+CMD_DO_FUN( do_forumlist_old);
 CMD_DO_FUN( do_forumlist);
 CMD_DO_FUN( do_friend );
 CMD_DO_FUN( do_from );
@@ -772,6 +821,7 @@ CMD_DO_FUN( do_look );
 CMD_DO_FUN( do_mail );
 CMD_DO_FUN( do_new );
 CMD_DO_FUN( do_newmsgs );
+CMD_DO_FUN( do_newmsgs_old );
 CMD_DO_FUN( do_next );
 CMD_DO_FUN( do_note );
 CMD_DO_FUN( do_notify );
@@ -779,6 +829,7 @@ CMD_DO_FUN( do_passwd );
 CMD_DO_FUN( do_plan );
 CMD_DO_FUN( do_previous );
 CMD_DO_FUN( do_read );
+CMD_DO_FUN( do_readinterval );
 CMD_DO_FUN( do_readall );
 CMD_DO_FUN( do_readlast );
 CMD_DO_FUN( do_remove );
@@ -791,14 +842,17 @@ CMD_DO_FUN( do_showclip );
 CMD_DO_FUN( do_skip );
 CMD_DO_FUN( do_time );
 CMD_DO_FUN( do_title );
+CMD_DO_FUN( do_charset );
 CMD_DO_FUN( do_toggle );
 CMD_DO_FUN( do_quit );
+CMD_DO_FUN( do_qui );
 CMD_DO_FUN( do_unalias );
 CMD_DO_FUN( do_unflash );
 CMD_DO_FUN( do_uptime );
 CMD_DO_FUN( do_version );
 CMD_DO_FUN( do_who );
 CMD_DO_FUN( do_Who );
+CMD_DO_FUN( do_Who_old );
 CMD_DO_FUN( do_whoami );
 CMD_DO_FUN( do_x );
 CMD_DO_FUN( do_xers );
@@ -811,6 +865,8 @@ CMD_DO_FUN( do_tr2en );
 CMD_DO_FUN( do_fr2tr );
 CMD_DO_FUN( do_tr2fr );
 CMD_DO_FUN( do_tr2tr );
+CMD_DO_FUN( do_dict );
+CMD_DO_FUN( do_disp_exchange );
 
 /* Moderator commands */
 CMD_DO_FUN( do_foruminfo);
@@ -824,7 +880,7 @@ CMD_DO_FUN( do_banish );
 CMD_DO_FUN( do_deluser );
 CMD_DO_FUN( do_disconnect);
 CMD_DO_FUN( do_echo );
-CMD_DO_FUN( do_yalama );
+//CMD_DO_FUN( do_yalama );
 CMD_DO_FUN( do_force );
 CMD_DO_FUN( do_hostname );
 CMD_DO_FUN( do_invis );
@@ -844,3 +900,30 @@ CMD_DO_FUN( do_delforum );
 CMD_DO_FUN( do_setforum );
 CMD_DO_FUN( do_showmods );
 CMD_DO_FUN( do_statforum);
+CMD_DO_FUN( do_loadfeeling);
+CMD_DO_FUN( do_loadhelp);
+CMD_DO_FUN( do_say);
+
+#define BOARD_NORMAL		1
+#define BOARD_ADMIN			2
+#define BOARD_GAME			3
+#define BOARD_ANONYMOUS		4
+#define BOARD_SECRET		5
+
+#define DEFAULT_CAPACITY	150
+
+bool can_write(USER_DATA * usr, BOARD_DATA * pBoard);
+bool can_remove(USER_DATA * usr, NOTE_DATA * pNote);
+void save_notes(BOARD_DATA * pBoard);
+bool is_kicked(USER_DATA * usr, BOARD_DATA * pBoard, bool fMessage);
+void do_quit_org(USER_DATA * usr, char *argument, bool fXing);
+
+void initCpp(void);
+
+#ifdef __cplusplus
+} // extern "C" 
+#endif
+
+#endif // __BBS_H__
+
+

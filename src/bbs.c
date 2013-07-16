@@ -65,7 +65,7 @@ int init_socket(int port);
 void init_desc(int control);
 bool read_from_desc(DESC_DATA *d);
 void read_from_buffer(DESC_DATA *d);
-bool write_to_desc(int desc, char *txt, int length);
+bool write_to_desc(int desc, char *txt, int length, DESC_DATA * dData);
 bool process_output(DESC_DATA *d, bool fPrompt);
 void login(DESC_DATA *d, char *argument);
 bool legal_name(char *name);
@@ -129,14 +129,18 @@ int main(int argc, char *argv[]) {
 
 	if (fCopyOver)
 		copyover_recover();
-		
+
+
+	createExchangeThread();
 	init_dict();
+  initCpp();
 
 	bbs_loop(control);
 	close(control);
-	
+
 	done_dict();
-	
+	finishExchangeThread();
+
 	log_string("Normal termination of bbs.");
 	exit(0);
 	return 0;
@@ -267,14 +271,22 @@ void bbs_loop(int control) {
 				process_resolve(d);
 
 			read_from_buffer(d);
+			
+			if (d && USR(d) && d->incomm[0]) {
+         int nConvLen = 0;
+         char * p = iconv_strndup(d->incomm, strlen(d->incomm), "UTF-8", 
+           USR(d)->clientCharset, &nConvLen);
+         strncpy(d->incomm, p, nConvLen);
+         free(p);         
+         d->incomm[nConvLen+1] = '\0';
+      }
+			
 			if (d->incomm[0] != '\0') {
 				d->fcommand = TRUE;
+				
 
 				if (d->showstr_point) {
-					if (USR(d) && !str_cmp(USR(d)->lastCommand, "mx"))
-						show_string(d, d->incomm, TRUE);
-					else
-						show_string(d, d->incomm, FALSE);
+					show_string(d, d->incomm);
 				} else if (d->pString)
 					string_add(USR(d), d->incomm);
 				else if (d->login == CON_LOGIN) {
@@ -409,7 +421,8 @@ void init_desc(int control) {
 	char buf[STRING_LENGTH];
 	struct sockaddr_in sock;
 	DESC_DATA *dnew;
-	int desc, size;
+	int desc;
+	socklen_t size;
 
 	size = sizeof(sock);
 	getsockname(control, (struct sockaddr *) &sock, &size);
@@ -578,15 +591,15 @@ bool read_from_desc(DESC_DATA *d) {
 	if (iStart >= sizeof(d->inbuf) - 10) {
 		sprintf(log_buf, "%s input overflow!", d->host);
 		log_string(log_buf);
-		write_to_desc(d->descr, "\n\r*** FLOODING!!! ***\n\r", 0);
+		write_to_desc(d->descr, "\r\n*** FLOODING!!! ***\r\n", 0, NULL);
 		return FALSE;
 	}
 
 	for (;;) {
 		int nRead;
-
-		nRead = recv(d->descr, d->inbuf + iStart, sizeof(d->inbuf) - 10
-				- iStart, 0);
+	
+	  nRead = recv(d->descr, d->inbuf + iStart, sizeof(d->inbuf) - 50 - iStart, 0);
+	  
 		if (nRead > 0) {
 			iStart += nRead;
 			if (d->inbuf[iStart-1] == '\n' || d->inbuf[iStart-1] == '\r')
@@ -619,7 +632,7 @@ void read_from_buffer(DESC_DATA *d) {
 		if ((d->inbuf[i] & 0xff) == IAC) {
 			int cmd = (d->inbuf[++i] & 0xff);
 			int opt = (d->inbuf[++i] & 0xff);
-			switch(cmd) {
+			switch (cmd) {
 				case SE:
 				case DO:
 				case DONT:
@@ -634,11 +647,16 @@ void read_from_buffer(DESC_DATA *d) {
 						d->rows = (d->inbuf[++i] & 0xff) << 8;
 						d->rows |= (d->inbuf[++i] & 0xff);
 						// Limit to max 200x200, just in case
-						if (d->cols > 200) d->cols = 200;
-						if (d->rows > 200) d->rows = 200;
-						if (USR(d)) {
+						if (d->cols > 200)
+							d->cols = 200;
+						if (d->rows > 200)
+							d->rows = 200;
+						if (USR(d) && !IS_TOGGLE(USR(d), TOGGLE_HELP)) {
 							char buf[STRING];
-							sprintf(buf, "\n\r#WOkay. Your window size is now #C%ld#Wx#C%ld#x\n\r\n\r", d->cols, d->rows);
+							sprintf(
+									buf,
+									"\r\n#WOkay. Your window size is now #C%ld#Wx#C%ld#x\r\n\r\n",
+									d->cols, d->rows);
 							send_to_user(buf, USR(d));
 						}
 					}
@@ -658,7 +676,7 @@ void read_from_buffer(DESC_DATA *d) {
 
 	for (i = 0, k = 0; d->inbuf[i] != '\n' && d->inbuf[i] != '\r'; i++) {
 		if (k >= INPUT_LENGTH - 2) {
-			write_to_desc(d->descr, "Line too long.\n\r", 0);
+			write_to_desc(d->descr, "Line too long.\r\n", 0, NULL);
 			for (; d->inbuf[i] != '\0'; i++) {
 				if (d->inbuf[i] == '\n' || d->inbuf[i] == '\r')
 					break;
@@ -671,7 +689,7 @@ void read_from_buffer(DESC_DATA *d) {
 
 		if (d->inbuf[i] == '\b' && k > 0) {
 			--k;
-		} else if (isascii(d->inbuf[i]) && isprint(d->inbuf[i])) {
+		} else if ((isascii(d->inbuf[i]) && isprint(d->inbuf[i])) || d->inbuf[i] < 0) {
 			d->incomm[k++] = d->inbuf[i];
 		}
 	}
@@ -719,7 +737,7 @@ bool process_output(DESC_DATA *d, bool fPrompt) {
 	int total_lines = 0;
 	USER_DATA *usr;
 	DESC_DATA *snoop;
-
+	
 	if (!bbs_down) {
 		if (d->showstr_point) {
 			for (ptr = d->showstr_head; ptr != d->showstr_point; ptr++)
@@ -737,16 +755,16 @@ bool process_output(DESC_DATA *d, bool fPrompt) {
 					100 * shown_lines / total_lines);
 				else
 					print_to_user(USR(d),
-					"\n\r\033[0;0;30;47m--- More --- (%d%%)\033[0;0;37;40m "
+					"\r\n\033[0;0;30;47m--- More --- (%d%%)\033[0;0;37;40m "
 					"('h' for help) ", 100 * shown_lines / total_lines);
 			} else {
-				if (USR(d) != NULL && USR(d)->lastCommand != NULL ) {
+				if (USR(d) != NULL && USR(d)->lastCommand != NULL) {
 					if (!str_cmp(USR(d)->lastCommand, "mx") && USR(d))
 						print_to_user(USR(d), "More (%d%%) [<cr>,p,r,q,?] ",
 						100 * shown_lines / total_lines);
 					else {
-						sprintf(buf, "\n\r--- More --- (%d%%) ('h' for help) ", 100
-								* shown_lines / total_lines);
+						sprintf(buf, "\r\n--- More --- (%d%%) ('h' for help) ",
+								100 * shown_lines / total_lines);
 						write_to_buffer(d, buf, 0);
 					}
 				}
@@ -766,15 +784,15 @@ bool process_output(DESC_DATA *d, bool fPrompt) {
 					break;
 
 				case EDITOR_PWD_OLD:
-					write_to_buffer(d, "\n\rOld password: ", 0);
+					write_to_buffer(d, "\r\nOld password: ", 0);
 					break;
 
 				case EDITOR_PWD_NEW_ONE:
-					write_to_buffer(d, "\n\rNew password: ", 0);
+					write_to_buffer(d, "\r\nNew password: ", 0);
 					break;
 
 				case EDITOR_PWD_NEW_TWO:
-					write_to_buffer(d, "\n\rRetype password: ", 0);
+					write_to_buffer(d, "\r\nRetype password: ", 0);
 					break;
 
 				case EDITOR_MAIL:
@@ -821,20 +839,20 @@ bool process_output(DESC_DATA *d, bool fPrompt) {
 						clear_buf(usr->pBuffer);
 					}
 					/* Yoksa burada unititialized bir pointer mi var ne?" */
-					
-					if ( usr == NULL) {
+
+					if (usr == NULL) {
 						perror("usr is null");
 						break;
 					}
 
-					if ( usr->pBoard == NULL ) {
+					if (usr->pBoard == NULL) {
 						perror("usr->pBoard is null!");
 						break;
 
 					}
-					
-					if ( usr->pBoard->long_name == NULL ) {
-						perror ("usr->pBoard->long_name");
+
+					if (usr->pBoard->long_name == NULL) {
+						perror("usr->pBoard->long_name");
 						break;
 					}
 					/* Imdaaat burasi hep patliyor */
@@ -857,22 +875,23 @@ bool process_output(DESC_DATA *d, bool fPrompt) {
 	for (snoop = desc_list; snoop != NULL; snoop = snoop->next) {
 		if (USR(snoop) && USR(d) && !str_cmp(USR(snoop)->snooped, USR(d)->name)) {
 			if (isBusySelf(USR(snoop))) {
-				add_buffer(USR(snoop), "\n\r#W>#x Snooped: ");
+				add_buffer(USR(snoop), "\r\n#W>#x Snooped: ");
 				add_buffer(USR(snoop), USR(d)->name);
-				add_buffer(USR(snoop), "\n\r#W>#x Begin\n\r");
+				add_buffer(USR(snoop), "\r\n#W>#x Begin\r\n");
 				add_buffer(USR(snoop), d->outbuf);
-				add_buffer(USR(snoop), "\n\r#W>#x End\n\r\n\r");
+				add_buffer(USR(snoop), "\r\n#W>#x End\r\n\r\n");
 			} else {
-				send_to_user("\n\r#W>#x Snooped: ", USR(snoop));
+				send_to_user("\r\n#W>#x Snooped: ", USR(snoop));
 				send_to_user(USR(d)->name, USR(snoop));
-				send_to_user("\n\r#W>#x Begin\n\r", USR(snoop));
+				send_to_user("\r\n#W>#x Begin\r\n", USR(snoop));
 				send_to_user(d->outbuf, USR(snoop));
-				send_to_user("\n\r#W>#x End\n\r\n\r", USR(snoop));
+				send_to_user("\r\n#W>#x End\r\n\r\n", USR(snoop));
 			}
 		}
 	}
-
-	if (!write_to_desc(d->descr, d->outbuf, d->outtop)) {
+	
+	
+  if (!write_to_desc(d->descr, d->outbuf, d->outtop, d)) {
 		d->outtop = 0;
 		return FALSE;
 	} else {
@@ -889,7 +908,7 @@ void write_to_buffer(DESC_DATA *d, const char *txt, int length) {
 
 	if (!d->outbuf)
 		return;
-
+		
 	if (length <= 0)
 		length = strlen(txt);
 
@@ -904,8 +923,8 @@ void write_to_buffer(DESC_DATA *d, const char *txt, int length) {
 
 		if (d->outsize >= 66000) {
 			d->outtop = 0;
-			bug("Buffer overflow. Closing.\n\r", 0);
-			write_to_desc(d->descr, "\n\r*** Buffer Overflow! ***\n\r", 0);
+			bug("Buffer overflow. Closing.\r\n", 0);
+			write_to_desc(d->descr, "\r\n*** Buffer Overflow! ***\r\n", 0, NULL);
 			close_socket(d);
 			return;
 		}
@@ -923,20 +942,36 @@ void write_to_buffer(DESC_DATA *d, const char *txt, int length) {
 	return;
 }
 
-bool write_to_desc(int desc, char *txt, int length) {
+bool write_to_desc(int desc, char *txt, int length, DESC_DATA * dData) {
 	int iStart, nWrite, nBlock;
+	
+	char * p = NULL;
 
 	if (length <= 0)
 		length = strlen(txt);
 
+	if (dData && USR(dData) && length > 0) {
+		int convLen = 0;
+		p = iconv_strndup(txt, length, USR(dData)->clientCharset, "UTF-8", &convLen);
+		if (convLen > 0) {
+			length = convLen;
+			txt = p;
+		} 
+	}
+
 	for (iStart = 0; iStart < length; iStart += nWrite) {
 		nBlock = UMIN(length - iStart, 4096);
 		if ((nWrite = send(desc, txt + iStart, nBlock, 0)) < 0) {
-			perror("Write_to_desc: write");
-			return FALSE;
+			if (errno != EAGAIN) {
+				if (p) free(p);
+				perror("Write_to_desc: send");
+				return FALSE;
+			}
+			nWrite = 0;
 		}
 	}
-
+  
+	if (p) free(p);
 	return TRUE;
 }
 
@@ -970,14 +1005,14 @@ void login(DESC_DATA *d, char *argument) {
 								&& !str_cmp(usr->name, USR(d_old)->name)) {
 							if (d_old->login == CON_LOGIN) {
 								sprintf(buf, "You have been replaced by "
-									"someone from: %s.\n\r", d->host);
+									"someone from: %s.\r\n", d->host);
 								write_to_buffer(d_old, buf, 0);
 								free_user(USR(d));
 								USR(d) = USR(d_old);
 								USR(d_old)->desc = NULL;
 								USR(d)->desc = d;
 								USR(d_old) = NULL;
-								write_to_buffer(d, "Kicking off old link.\n\r",
+								write_to_buffer(d, "Kicking off old link.\r\n",
 										0);
 								close_socket(d_old);
 								d->login = CON_LOGIN;
@@ -992,7 +1027,7 @@ void login(DESC_DATA *d, char *argument) {
 								return;
 							}
 							write_to_buffer(d,
-									"Reconnect attempt failed.\n\rName: ", 0);
+									"Reconnect attempt failed.\r\nName: ", 0);
 							if (USR(d)) {
 								free_user(USR(d));
 								USR(d) = NULL;
@@ -1002,7 +1037,7 @@ void login(DESC_DATA *d, char *argument) {
 						}
 					}
 
-					write_to_buffer(d, "Reconnect attempt failed.\n\rName: ", 0);
+					write_to_buffer(d, "Reconnect attempt failed.\r\nName: ", 0);
 					if (USR(d)) {
 						free_user(USR(d));
 						USR(d) = NULL;
@@ -1031,13 +1066,13 @@ void login(DESC_DATA *d, char *argument) {
 			argument[0] = UPPER(argument[0]);
 
 			if (!legal_name(argument)) {
-				write_to_buffer(d, "Illegal name, try another name.\n\rName: ",
+				write_to_buffer(d, "Illegal name, try another name.\r\nName: ",
 						0);
 				return;
 			}
 
 			if (!str_cmp(argument, "bye")) {
-				write_to_buffer(d, "Goodbye...\n\r", 0);
+				write_to_buffer(d, "Goodbye...\r\n", 0);
 				close_socket(d);
 				return;
 			}
@@ -1046,7 +1081,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (IS_SET(config.bbs_flags, BBS_ADMLOCK)) {
 					sprintf(
 							buf,
-							"%s BBS is running *Admin Only* mode. Try again later.\n\r",
+							"%s BBS is running *Admin Only* mode. Try again later.\r\n",
 							config.bbs_name);
 					write_to_buffer(d, buf, 0);
 					close_socket(d);
@@ -1056,7 +1091,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (IS_SET(config.bbs_flags, BBS_NEWLOCK)) {
 					sprintf(
 							buf,
-							"%s BBS is not allowing new users temporarily.\n\r",
+							"%s BBS is not allowing new users temporarily.\r\n",
 							config.bbs_name);
 					write_to_buffer(d, buf, 0);
 					close_socket(d);
@@ -1066,26 +1101,26 @@ void login(DESC_DATA *d, char *argument) {
 				if (d->newbie == 0) {
 					write_to_buffer(
 							d,
-							"\n\r\n\rPlease choose a name for this system.  Please choose carefully, you cannot\n\r"
-								"change your name once your account is created, the only way to get a different\n\r"
-								"name is to have your old one deleted and create a new one from scratch.  This\n\r"
-								"use to login with, and doesn't have to be your real name.  In fact, it is very\n\r"
-								"rare that someone use their real name as a login name.  We will need your real\n\r"
-								"name later for our records, however.\n\r\n\r"
-								"Something important to know:  If you are female, you may not want to choose a\n\r"
-								"name for yourself that makes this fact obvious.  The anonymity of this BBS, and\n\r"
-								"computers in general, seems to bring out the worst in some people, and it is an\n\r"
-								"unfortunate fact that some people believe this anonymity gives them free reign\n\r"
-								"to harass others.  The harassment is often directed at those with female\n\r"
-								"sounding names, choosing a gender neutral name for yourself can help quite a\n\r"
-								"bit in avoiding this.\n\r\n\r", 0);
+							"\r\n\r\nPlease choose a name for this system.  Please choose carefully, you cannot\r\n"
+								"change your name once your account is created, the only way to get a different\r\n"
+								"name is to have your old one deleted and create a new one from scratch.  This\r\n"
+								"use to login with, and doesn't have to be your real name.  In fact, it is very\r\n"
+								"rare that someone use their real name as a login name.  We will need your real\r\n"
+								"name later for our records, however.\r\n\r\n"
+								"Something important to know:  If you are female, you may not want to choose a\r\n"
+								"name for yourself that makes this fact obvious.  The anonymity of this BBS, and\r\n"
+								"computers in general, seems to bring out the worst in some people, and it is an\r\n"
+								"unfortunate fact that some people believe this anonymity gives them free reign\r\n"
+								"to harass others.  The harassment is often directed at those with female\r\n"
+								"sounding names, choosing a gender neutral name for yourself can help quite a\r\n"
+								"bit in avoiding this.\r\n\r\n", 0);
 					write_to_buffer(d,
 							"Choose a new name (maximum 12 characters): ", 0);
 					d->newbie++;
 					d->login = CON_GET_NAME;
 					return;
 				} else {
-					write_to_buffer(d, "Illegal name, try another.\n\rName: ",
+					write_to_buffer(d, "Illegal name, try another.\r\nName: ",
 							0);
 					return;
 				}
@@ -1095,7 +1130,7 @@ void login(DESC_DATA *d, char *argument) {
 			if (!USR(d)) {
 				sprintf(log_buf, "Bad user file %s@%s.", argument, d->host);
 				log_string(log_buf);
-				write_to_buffer(d, "ERROR: Your user file is corrupt.\n\r", 0);
+				write_to_buffer(d, "ERROR: Your user file is corrupt.\r\n", 0);
 				close_socket(d);
 				return;
 			}
@@ -1110,7 +1145,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (d->newbie != 0) {
 					write_to_buffer(
 							d,
-							"That name is already taken. Choose another.\n\rName: ",
+							"That name is already taken. Choose another.\r\nName: ",
 							0);
 					d->login = CON_GET_NAME;
 					return;
@@ -1119,7 +1154,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (IS_SET(config.bbs_flags, BBS_ADMLOCK) && !IS_ADMIN(usr)) {
 					sprintf(
 							buf,
-							"%s BBS is running *Admin Only* mode. Try again later.\n\r",
+							"%s BBS is running *Admin Only* mode. Try again later.\r\n",
 							config.bbs_name);
 					write_to_buffer(d, buf, 0);
 					close_socket(d);
@@ -1141,7 +1176,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (d->newbie == 0) {
 					write_to_buffer(
 							d,
-							"No such user exists.\n\rCheck your spelling, or type 'NEW' to start a new user.\n\rName: ",
+							"No such user exists.\r\nCheck your spelling, or type 'NEW' to start a new user.\r\nName: ",
 							0);
 					d->login = CON_GET_NAME;
 					return;
@@ -1155,7 +1190,7 @@ void login(DESC_DATA *d, char *argument) {
 				 if (d->login != CON_LOGIN && USR(d) && USR(d)->name
 				 && USR(d)->name[0] && !str_cmp(USR(d)->name, argument))
 				 {
-				 write_to_buffer(d, "That name is already taken. Choose another.\n\rName: ", 0);
+				 write_to_buffer(d, "That name is already taken. Choose another.\r\nName: ", 0);
 				 d->login = CON_GET_NAME;
 				 return;
 				 }
@@ -1164,14 +1199,14 @@ void login(DESC_DATA *d, char *argument) {
 
 				write_to_buffer(
 						d,
-						"\n\r\n\rNow choose a password for this system.  It is a good idea to choose a password\n\r"
-							"that another person, even one who knows you very well, would be unable to\n\r"
-							"guess.  Try something with punctuation, or a nonsense word such as glumph. It\n\r"
-							"is in your best interest to choose a password that no one else will guess,\n\r"
-							"because you are held responsible for the conduct of your account and your\n\r"
-							"privilege to use this BBS will be suspended if your account is used to take\n\r"
-							"actions that violate BBS rules.  Please do make sure you choose a password you\n\r"
-							"can remember, however, as getting it reset isn't an easy process.\n\r\n\r",
+						"\r\n\r\nNow choose a password for this system.  It is a good idea to choose a password\r\n"
+							"that another person, even one who knows you very well, would be unable to\r\n"
+							"guess.  Try something with punctuation, or a nonsense word such as glumph. It\r\n"
+							"is in your best interest to choose a password that no one else will guess,\r\n"
+							"because you are held responsible for the conduct of your account and your\r\n"
+							"privilege to use this BBS will be suspended if your account is used to take\r\n"
+							"actions that violate BBS rules.  Please do make sure you choose a password you\r\n"
+							"can remember, however, as getting it reset isn't an easy process.\r\n\r\n",
 						0);
 				sprintf(buf, "Choose a new password: %s", echo_off_str);
 				write_to_buffer(d, buf, 0);
@@ -1182,17 +1217,17 @@ void login(DESC_DATA *d, char *argument) {
 
 		case CON_GET_VALIDATE:
 			if (atoi(argument) != usr->key)
-				write_to_buffer(d, "That's not a valid key.\n\r", 0);
+				write_to_buffer(d, "That's not a valid key.\r\n", 0);
 			else {
 				usr->Validated = TRUE;
-				write_to_buffer(d, "Ok, you have been validated.\n\r", 0);
+				write_to_buffer(d, "Ok, you have been validated.\r\n", 0);
 			}
 			usr->next = user_list;
 			user_list = usr;
 			d->login = CON_LOGIN;
 			do_help(usr, "motd");
-			sprintf(buf, "Last login %s until %s from %s.#x\n\r\n\r"
-				"You are in the lobby now.\n\r", last_logon(usr),
+			sprintf(buf, "Last login %s until %s from %s.#x\r\n\r\n"
+				"You are in the lobby now.\r\n", last_logon(usr),
 					last_logoff(usr), usr->host_name);
 			send_to_user(buf, usr);
 			do_unread_mail(usr);
@@ -1210,9 +1245,9 @@ void login(DESC_DATA *d, char *argument) {
 			break;
 
 		case CON_GET_OLD_PASSWORD:
-			write_to_buffer(d, "\n\r", 2);
+			write_to_buffer(d, "\r\n", 2);
 			if (strcmp(crypt(argument, usr->password), usr->password)) {
-				write_to_buffer(d, "Wrong password.\n\r", 0);
+				write_to_buffer(d, "Wrong password.\r\n", 0);
 				if (usr->bad_pwd == 2) {
 					close_socket(d);
 					return;
@@ -1232,8 +1267,8 @@ void login(DESC_DATA *d, char *argument) {
 				return;
 
 			if (usr->password[0] == '\0') {
-				write_to_buffer(d, "Warning! Null password!\n\r", 0);
-				write_to_buffer(d, "Type 'password' to fix.\n\r", 0);
+				write_to_buffer(d, "Warning! Null password!\r\n", 0);
+				write_to_buffer(d, "Type 'password' to fix.\r\n", 0);
 			}
 
 			if (!usr->Validated) {
@@ -1245,11 +1280,12 @@ void login(DESC_DATA *d, char *argument) {
 			user_list = usr;
 			d->login = CON_LOGIN;
 			do_help(usr, "motd");
+			print_to_user(usr, "\033]0;%s\007", config.bbs_name);
 			sprintf(log_buf, "%s@%s has connected", usr->name, d->host);
 			log_string(log_buf);
 			syslog(log_buf, usr);
-			sprintf(buf, "Last login %s until %s from %s.#x\n\r\n\r"
-				"You are in the lobby now.\n\r", last_logon(usr),
+			sprintf(buf, "Last login %s until %s from %s.#x\r\n\r\n"
+				"You are in the lobby now.\r\n", last_logon(usr),
 					last_logoff(usr), usr->host_name);
 			send_to_user(buf, usr);
 			do_unread_mail(usr);
@@ -1268,18 +1304,18 @@ void login(DESC_DATA *d, char *argument) {
 			break;
 
 		case CON_GET_NEW_PASSWORD:
-			write_to_buffer(d, "\n\r", 2);
+			write_to_buffer(d, "\r\n", 2);
 			if (strlen(argument) < 5) {
 				write_to_buffer(
 						d,
-						"Password must be at least 5 characters long.\n\rPassword: ",
+						"Password must be at least 5 characters long.\r\nPassword: ",
 						0);
 				return;
 			}
 
 			if (strlen(argument) > 12) {
 				write_to_buffer(d,
-						"Password must be maximum 12 characters.\n\r", 0);
+						"Password must be maximum 12 characters.\r\n", 0);
 				return;
 			}
 
@@ -1288,7 +1324,7 @@ void login(DESC_DATA *d, char *argument) {
 				if (*password == '~') {
 					write_to_buffer(
 							d,
-							"New password not acceptable, try again.\n\rPassword: ",
+							"New password not acceptable, try again.\r\nPassword: ",
 							0);
 					return;
 				}
@@ -1302,9 +1338,9 @@ void login(DESC_DATA *d, char *argument) {
 			break;
 
 		case CON_CONFIRM_PASSWORD:
-			write_to_buffer(d, "\n\r", 2);
+			write_to_buffer(d, "\r\n", 2);
 			if (strcmp(crypt(argument, usr->password), usr->password)) {
-				write_to_buffer(d, "Passwords don't match.\n\rPassword: ", 0);
+				write_to_buffer(d, "Passwords don't match.\r\nPassword: ", 0);
 				d->login = CON_GET_NEW_PASSWORD;
 				return;
 			}
@@ -1312,7 +1348,7 @@ void login(DESC_DATA *d, char *argument) {
 			write_to_buffer(d, echo_on_str, 0);
 			write_to_buffer(
 					d,
-					"\n\r\n\rPlease give your full name, both first and last.  Do not abbreviate your name!\n\r\n\rEnter your real name (first and last): ",
+					"\r\n\r\nPlease give your full name, both first and last.  Do not abbreviate your name!\r\n\r\nEnter your real name (first and last): ",
 					0);
 			d->login = CON_GET_REALNAME;
 			break;
@@ -1321,7 +1357,7 @@ void login(DESC_DATA *d, char *argument) {
 			if (argument[0] == '\0') {
 				write_to_buffer(
 						d,
-						"Invalid real name.\n\rEnter your real name (first and last): ",
+						"Invalid real name.\r\nEnter your real name (first and last): ",
 						0);
 				return;
 			}
@@ -1332,16 +1368,16 @@ void login(DESC_DATA *d, char *argument) {
 			usr->real_name = str_dup(argument);
 			sprintf(
 					buf,
-					"\n\r\n\rLastly we ask for your internet e-mail address.  ** You must have an e-mail\n\r"
-						"address registered in your name! **\n\r"
-						"A validation key will be mailed to you at the address you give; your access\n\r"
-						"will be severely restricted until you enter this key!\n\r"
-						"Your email address should be of the form: userid@host.  Do not give a\n\r"
-						"shortened or abbreviated form of your email address, the full address is\n\r"
-						"necessary for the validation key to reach you allowing you to gain full\n\r"
-						"access to %s BBS.\n\r", config.bbs_name);
+					"\r\n\r\nLastly we ask for your internet e-mail address.  ** You must have an e-mail\r\n"
+						"address registered in your name! **\r\n"
+						"A validation key will be mailed to you at the address you give; your access\r\n"
+						"will be severely restricted until you enter this key!\r\n"
+						"Your email address should be of the form: userid@host.  Do not give a\r\n"
+						"shortened or abbreviated form of your email address, the full address is\r\n"
+						"necessary for the validation key to reach you allowing you to gain full\r\n"
+						"access to %s BBS.\r\n", config.bbs_name);
 			write_to_buffer(d, buf, 0);
-			write_to_buffer(d, "\n\rEnter your e-mail address (userid@host): ",
+			write_to_buffer(d, "\r\nEnter your e-mail address (userid@host): ",
 					0);
 			d->login = CON_GET_EMAIL;
 			break;
@@ -1350,13 +1386,13 @@ void login(DESC_DATA *d, char *argument) {
 			if (argument[0] == '\0') {
 				write_to_buffer(
 						d,
-						"Invalid e-mail address.\n\rEnter your e-mail address (userid@host): ",
+						"Invalid e-mail address.\r\nEnter your e-mail address (userid@host): ",
 						0);
 				return;
 			}
 			if (!(host = strchr(argument, '@'))) {
 				write_to_buffer(d,
-						"Address should be in the form userid@host.\n\r", 0);
+						"Address should be in the form userid@host.\r\n", 0);
 				write_to_buffer(d, "Enter your e-mail address: ", 0);
 				return;
 			}
@@ -1369,7 +1405,7 @@ void login(DESC_DATA *d, char *argument) {
 					|| !str_cmp(host, "artemis.efes.net") || !str_cmp(host,
 					"i.am") || !str_cmp(host, "rocketmail.com") || !str_cmp(
 					host, "postmaster.co.uk")) {
-				write_to_buffer(d, "This is not a valid e-mail address.\n\r"
+				write_to_buffer(d, "This is not a valid e-mail address.\r\n"
 					"Enter your e-mail address: ", 0);
 				return;
 			}
@@ -1380,13 +1416,13 @@ void login(DESC_DATA *d, char *argument) {
 			usr->email = str_dup(argument);
 			write_to_buffer(
 					d,
-					"\n\rOk, now we're got everything we need.  You can now review what you have\n\r",
+					"\r\nOk, now we're got everything we need.  You can now review what you have\r\n",
 					0);
 			write_to_buffer(
 					d,
-					"provided and be given a chance to correct yourself if you need a mistake.\n\rYou entered:\n\r\n\r",
+					"provided and be given a chance to correct yourself if you need a mistake.\r\nYou entered:\r\n\r\n",
 					0);
-			sprintf(buf, "Name: %s\n\rE-mail: %s\n\r\n\r", usr->real_name,
+			sprintf(buf, "Name: %s\r\nE-mail: %s\r\n\r\n", usr->real_name,
 					usr->email);
 			write_to_buffer(d, buf, 0);
 			write_to_buffer(d, "Does this look correct (Y/n)? ", 0);
@@ -1404,11 +1440,11 @@ void login(DESC_DATA *d, char *argument) {
 						free_string(usr->email);
 					usr->email = str_dup("NONE");
 					write_to_buffer(d,
-							"\n\rEnter your real name (first and last): ", 0);
+							"\r\nEnter your real name (first and last): ", 0);
 					d->login = CON_GET_REALNAME;
 					break;
 				default:
-					write_to_buffer(d, "\n\rAre you, male or female: ", 0);
+					write_to_buffer(d, "\r\nAre you, male or female: ", 0);
 					d->login = CON_GET_GENDER;
 					break;
 			}
@@ -1427,13 +1463,13 @@ void login(DESC_DATA *d, char *argument) {
 				default:
 					write_to_buffer(
 							d,
-							"That's not a valid gender.\n\rAre you, male or female: ",
+							"That's not a valid gender.\r\nAre you, male or female: ",
 							0);
 					return;
 			}
 			write_to_buffer(
 					d,
-					"\n\rEnter your homepage url, press ENTER if you don't have: ",
+					"\r\nEnter your homepage url, press ENTER if you don't have: ",
 					0);
 			d->login = CON_GET_HOMEPAGE;
 			break;
@@ -1458,10 +1494,10 @@ void login(DESC_DATA *d, char *argument) {
 			usr->total_login++;
 			sprintf(
 					buf,
-					"\n\r\n\rYour validation key will now be generated and automatically e-mailed to you\n\r"
-						"at the e-mail address you have provided.  Please note that each key is unique,\n\r"
-						"if you lose this one and a new one must be generated this one will no longer\n\r"
-						"work.\n\r\n\rKey created %s for '%s'.\n\r\n\r",
+					"\r\n\r\nYour validation key will now be generated and automatically e-mailed to you\r\n"
+						"at the e-mail address you have provided.  Please note that each key is unique,\r\n"
+						"if you lose this one and a new one must be generated this one will no longer\r\n"
+						"work.\r\n\r\nKey created %s for '%s'.\r\n\r\n",
 					last_logon(usr), usr->email);
 			write_to_buffer(d, buf, 0);
 			add_validate(usr);
@@ -1469,7 +1505,7 @@ void login(DESC_DATA *d, char *argument) {
 			log_string(log_buf);
 			syslog(log_buf, usr);
 			do_help(usr, "motd");
-			write_to_buffer(d, "You are in the lobby now.\n\r", 0);
+			write_to_buffer(d, "You are in the lobby now.\r\n", 0);
 			usr->next = user_list;
 			user_list = usr;
 			d->login = CON_LOGIN;
@@ -1553,7 +1589,7 @@ bool check_reconnect(DESC_DATA *d, char *name, bool fConn) {
 				free_user(USR(d));
 				USR(d) = usr;
 				usr->desc = d;
-				send_to_user("Reconnecting.\n\r", usr);
+				send_to_user("Reconnecting.\r\n", usr);
 				sprintf(log_buf, "%s@%s reconnected", usr->name, d->host);
 				log_string(log_buf);
 				syslog(log_buf, usr);
@@ -1573,7 +1609,7 @@ bool check_login(DESC_DATA *d, char *name) {
 	for (dold = desc_list; dold; dold = dold->next) {
 		if (dold != d && USR(dold) && dold->login != CON_GET_NAME && dold->login
 				!= CON_GET_OLD_PASSWORD && !str_cmp(name, USR(dold)->name)) {
-			write_to_buffer(d, "That user is already login.\n\r", 0);
+			write_to_buffer(d, "That user is already login.\r\n", 0);
 			write_to_buffer(d, "Do you wish to connect anyway (Y/n)? ", 0);
 			d->login = CON_BREAK_CONNECT;
 			return TRUE;
@@ -1586,7 +1622,7 @@ bool check_login(DESC_DATA *d, char *name) {
 void syntax(const char *txt, USER_DATA *usr) {
 	char buf[STRING_LENGTH];
 
-	sprintf(buf, "Usage: %s\n\r", txt);
+	sprintf(buf, "Usage: %s\r\n", txt);
 	send_to_user(buf, usr);
 	return;
 }
@@ -1609,125 +1645,92 @@ void print_to_user_bw(USER_DATA *usr, char *format, ...) {
 	va_start(args, format);
 	vsprintf(buf, format, args);
 	va_end(args);
-	send_to_user_bw(buf, usr);
+	send_to_user_c(buf, usr, FALSE);
 	return;
 }
 
-void send_to_user_bw(const char *txt, USER_DATA *usr) {
-	if (txt && usr->desc)
-		write_to_buffer(usr->desc, txt, strlen(txt));
-	return;
-}
-
-void send_to_user(const char *txt, USER_DATA *usr) {
+void sendOrPageToUser(const char *txt, USER_DATA *usr, bool colors, bool page) {
+	char buf[4 * STRING_LENGTH];
 	const char *point;
 	char *point2;
-	char buf[4 * STRING_LENGTH];
-	int skip = 0;
+	
+	//int convLen = 0;
+  //char * cstr = iconv_strndup(txt, strlen(txt), usr->clientCharset, "UTF-8", &convLen);
+  
+  //txt = cstr;
 
 	buf[0] = '\0';
 	point2 = buf;
 
 	if (txt && usr->desc) {
-		if (IS_TOGGLE(usr, TOGGLE_ANSI)) {
-			for (point = txt; *point; point++) {
+		for (point = txt; *point; point++) {
+			if (*point == '#') {
+				point++;
 				if (*point == '#') {
-					point++;
-					skip = color(*point, point2);
-					while (skip-- > 0)
-						++point2;
+					*point2 = *point;
+					point2++;
 					continue;
 				}
-				*point2 = *point;
-				*++point2 = '\0';
-			}
-			*point2 = '\0';
-			write_to_buffer(usr->desc, buf, point2 - buf);
-		} else {
-			for (point = txt; *point; point++) {
-				if (*point == '#') {
-					point++;
-					continue;
+				if (colors) {
+					int s = color(point, point2);
+					point2 += s & 0xffff;
+					point += s >> 16;
+				} else {
+					if (*point == '[' || *point == ']') {
+						char* sp = strchr(point, ';');
+						if (sp != NULL) {
+							int i = sp - point - 1;
+							if (i > 3) {
+								point--;
+							} else {
+								char buf[5];
+								memcpy(&buf, &point[1], i);
+								buf[i] = '\0';
+								if (!is_number(buf)) {
+									point--;
+								} else {
+									point += i + 1;
+								}
+							}
+						}
+					}
 				}
-				*point2 = *point;
-				*++point2 = '\0';
-			}
-			*point2 = '\0';
-			write_to_buffer(usr->desc, buf, point2 - buf);
+				continue;
+			}			
+			*point2 = *point;
+			*++point2 = '\0';
 		}
-	}
-
-	return;
-}
-
-void page_to_user_bw(const char *txt, USER_DATA *usr) {
-	if (txt == NULL || usr->desc == NULL)
-		return;
-
-	free_string(usr->desc->showstr_head);
-	usr->desc->showstr_head = str_dup(txt);
-	usr->desc->showstr_point = usr->desc->showstr_head;
-	show_string(usr->desc, "", FALSE);
-}
-
-void msg_to_user(const char *txt, USER_DATA *usr) {
-	if (txt == NULL || usr->desc == NULL)
-		return;
-
-	free_string(usr->desc->showstr_head);
-	usr->desc->showstr_head = str_dup(txt);
-	usr->desc->showstr_point = usr->desc->showstr_head;
-	show_string(usr->desc, "", TRUE);
-}
-
-void page_to_user(const char *txt, USER_DATA *usr) {
-	char buf[4 * STRING_LENGTH];
-	const char *point;
-	char *point2;
-	int skip = 0;
-
-	buf[0] = '\0';
-	point2 = buf;
-
-	if (txt && usr->desc) {
-		if (IS_TOGGLE(usr, TOGGLE_ANSI)) {
-			for (point = txt; *point; point++) {
-				if (*point == '#') {
-					point++;
-					skip = color(*point, point2);
-					while (skip-- > 0)
-						++point2;
-					continue;
-				}
-				*point2 = *point;
-				*++point2 = '\0';
-			}
-			*point2 = '\0';
+		*point2 = '\0';
+		if (page && !IS_TOGGLE(usr, TOGGLE_MORE)) {
 			free_string(usr->desc->showstr_head);
 			usr->desc->showstr_head = str_dup(buf);
 			usr->desc->showstr_point = usr->desc->showstr_head;
-			show_string(usr->desc, "", FALSE);
+			show_string(usr->desc, "");
 		} else {
-			for (point = txt; *point; point++) {
-				if (*point == '#') {
-					point++;
-					continue;
-				}
-				*point2 = *point;
-				*++point2 = '\0';
-			}
-			*point2 = '\0';
-			free_string(usr->desc->showstr_head);
-			usr->desc->showstr_head = str_dup(buf);
-			usr->desc->showstr_point = usr->desc->showstr_head;
-			show_string(usr->desc, "", FALSE);
+			write_to_buffer(usr->desc, buf, point2 - buf);
 		}
 	}
-
+  //free(cstr);
 	return;
 }
 
-void show_string(struct desc_data *d, char *input, bool fMx) {
+void send_to_user(const char* txt, USER_DATA* usr) {
+	send_to_user_c(txt, usr, IS_TOGGLE(usr, TOGGLE_ANSI));
+}
+
+void send_to_user_c(const char *txt, USER_DATA *usr, bool showColors) {
+	sendOrPageToUser(txt, usr, showColors, FALSE);
+}
+
+void page_to_user(const char*txt, USER_DATA* usr) {
+	page_to_user_c(txt, usr, IS_TOGGLE(usr, TOGGLE_ANSI));
+}
+
+void page_to_user_c(const char *txt, USER_DATA *usr, bool showColors) {
+	sendOrPageToUser(txt, usr, showColors, TRUE);
+}
+
+void show_string(struct desc_data *d, char *input) {
 	char buffer[6 * STRING];
 	char buf[INPUT];
 	register char *scan;
@@ -1743,31 +1746,22 @@ void show_string(struct desc_data *d, char *input, bool fMx) {
 
 		case 'H':
 		case '?':
-			if (fMx)
-				write_to_buffer(d, "c          - continue\n\r"
-					"r          - redraw this page\n\r"
-					"p          - back one page\n\r"
-					"h or ?     - this help\n\r"
-					"q or other - exit\n\r", 0);
-			else
-				write_to_buffer(d, "c          - continue\n\r"
-					"r          - redraw this page\n\r"
-					"b          - back one page\n\r"
-					"h or ?     - this help\n\r"
-					"q or other - exit\n\r", 0);
-			toggle = 1;
-			break;
+			write_to_buffer(d, "c    - continue\r\n"
+				"r    - redraw this page\r\n"
+				"b    - back one page\r\n"
+				"h, ? - this help\r\n"
+				"q    - exit\r\n", 0);
+			return;
 
 		case 'R':
 			toggle = 1;
 			break;
 
 		case 'B':
-		case 'P':
 			toggle = 2;
 			break;
 
-		default:
+		case 'Q':
 			if (d->showstr_head) {
 				free_string(d->showstr_head);
 				d->showstr_head = str_dup("");
@@ -1841,13 +1835,14 @@ char * last_logoff(USER_DATA *usr) {
 	return str_dup(buf2);
 }
 
-int color(char type, char *string) {
-	char code[20];
+int color(const char* type, char *string) {
+	char code[40];
 	char *p = '\0';
+	int fudge = 0;
 
-	switch (type) {
+	switch (type[0]) {
 		default:
-			sprintf(code, "#%c", type);
+			sprintf(code, "#%c", type[0]);
 			break;
 		case 'x':
 		case 'w':
@@ -1895,6 +1890,41 @@ int color(char type, char *string) {
 		case 'D':
 			sprintf(code, COLOR_DARK);
 			break;
+		case '[': // consume up to ';' and create xterm foreground color
+		case ']': { // consume up to ';' and create xterm background color
+			int c = 0, i = 0;
+			char buf[5];
+			char* sp = strchr(type, ';');
+			if (sp != NULL) {
+				i = sp - type - 1;
+				if (i > 3) {
+					sprintf(code, "#%c", type[0]);
+					break;
+				}
+				memcpy(&buf, &type[1], i);
+				buf[i] = '\0';
+				if (!is_number(buf)) {
+					sprintf(code, "#%c", type[0]);
+					break;
+				}
+				c = atoi(buf);
+				sprintf(code, "\033[%d;5;%dm", type[0] == '[' ? 38 : 48, c);
+				fudge = i + 1; // count the ';' as well
+			} else {
+				sprintf(code, "#%c", type[0]);
+			}
+			break;
+		}
+		case '_':
+			sprintf(code, COLOR_UNDERLINE);
+			break;
+		// dogru durust calismiyor bunlar su anda..
+		//case '(':
+		//	sprintf(code, "\033(0");
+		//	break;
+		//case ')':
+		//	sprintf(code, "\033(B");
+		//	break;
 	}
 
 	p = code;
@@ -1904,7 +1934,7 @@ int color(char type, char *string) {
 		*++string = '\0';
 	}
 
-	return (strlen(code));
+	return (fudge << 16) + strlen(code);
 }
 
 void get_small_host(USER_DATA *usr) {

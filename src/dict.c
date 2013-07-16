@@ -61,7 +61,7 @@ int dictCallback(void *p, int nCols, char **values, char **headers) {
 		if (!(i % 2))
 			sprintf(buf, "#G%s: ", values[i]);
 		else
-			sprintf(buf, "#W%s#x\n\r", values[i]);
+			sprintf(buf, "#W%s#x\r\n", values[i]);
 		send_to_user(buf, params->usr);
 	}
 	return 0;
@@ -88,7 +88,7 @@ void queryDictionary(sqlite3 ** db, USER_DATA *usr, char * argument) {
 		return;
 	}
 	if (p.nRecs == 0) {
-		send_to_user("Sorry, don't know what that means.\n\r", usr);
+		send_to_user("Sorry, don't know what that means.\r\n", usr);
 	}
 }
 
@@ -130,4 +130,47 @@ void do_tr2fr(USER_DATA *usr, char *argument) {
 void do_tr2tr(USER_DATA *usr, char *argument) {
 	if (db_tr2tr)
 		queryDictionary(&db_tr2tr, usr, argument);
+}
+
+void do_dict(USER_DATA *usr, char *argument) {
+    
+    if ('\0' == argument[0]) {    // eger parametre yoksa
+        do_help(usr, "dict");     // "dict" in helpini cagir
+        return;
+    }  
+   
+	send_to_user("#YUsing all dictionaries...#x\r\n", usr);
+
+	if (db_de2tr) {	
+        send_to_user("#Rde2tr (German to Turkish) :#x\r\n", usr);
+		queryDictionary(&db_de2tr, usr, argument);
+    }
+	if (db_tr2de) {
+        send_to_user("#Rtr2de (Turkish to German) :#x\r\n", usr);
+		queryDictionary(&db_tr2de, usr, argument);
+    }
+	if (db_en2en) {
+        send_to_user("#Ren2en (English to English):#x\r\n", usr);
+		queryDictionary(&db_en2en, usr, argument);
+    }
+	if (db_en2tr) {
+        send_to_user("#Ren2tr (English to Turkish):#x\r\n", usr);
+		queryDictionary(&db_en2tr, usr, argument);
+    }
+	if (db_tr2en) {
+        send_to_user("#Rtr2en (Turkish to English):#x\r\n", usr);
+		queryDictionary(&db_tr2en, usr, argument);
+    }
+	if (db_fr2tr) {
+        send_to_user("#Rfr2tr (French to Turkish) :#x\r\n", usr);
+		queryDictionary(&db_fr2tr, usr, argument);
+    }
+	if (db_tr2fr) {
+        send_to_user("#Rtr2fr (Turkish to French) :#x\r\n", usr);
+		queryDictionary(&db_tr2fr, usr, argument);
+    }
+	if (db_tr2tr) {
+        send_to_user("#Rtr2tr (Turkish to Turkish):#x\r\n", usr);
+		queryDictionary(&db_tr2tr, usr, argument);
+    }
 }

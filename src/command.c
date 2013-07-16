@@ -51,9 +51,11 @@ const struct cmd_type cmd_table [] = { //
 				{ "finger", do_finger, 0, 1, 1 }, //
 				{ "feeling", do_feeling, 0, 1, 0 }, //
 				{ "fl", do_forumlist, 0, 0, 1 }, //
+				{ "fl_old", do_forumlist_old, 0, 0, 1 }, //
 				{ "fly", do_jump, 0, 0, 1 }, //
 				{ "fnotify", do_fnotify, 0, 1, 0 }, //
 				{ "forumlist", do_forumlist, 0, 1, 1 }, //
+				{ "forumlist_old", do_forumlist_old, 0, 1, 1 }, //
 				{ "friend", do_friend, 0, 1, 0 }, //
 				{ "from", do_from, 0, 1, 0 }, //
 				{ "go", do_jump, 0, 0, 1 }, //
@@ -71,8 +73,10 @@ const struct cmd_type cmd_table [] = { //
 				{ "mx", do_mx, 0, 1, 0 }, //
 				{ "new", do_new, 0, 1, 0 }, //
 				{ "newmsgs", do_newmsgs, 0, 1, 1 }, //
+				{ "newmsgs_old", do_newmsgs_old, 0, 1, 1 }, //
 				{ "next", do_next, 0, 1, 0 }, //
 				{ "nm", do_newmsgs, 0, 0, 1 }, //
+				{ "nm_old", do_newmsgs_old, 0, 0, 1 }, //
 				{ "note", do_note, 0, 1, 0 }, //
 				{ "notify", do_notify, 0, 1, 0 }, //
 				{ "nx", do_next, 0, 0, 0 }, //
@@ -81,10 +85,12 @@ const struct cmd_type cmd_table [] = { //
 				{ "profile", do_plan, 0, 0, 0 }, //
 				{ "password", do_passwd, 0, 1, 1 }, // 
 				{ "reply", do_reply, 0, 1, 0 }, // 
-				{ "read", do_read, 0, 1, 0 }, // 
+				{ "read", do_read, 0, 1, 0 }, // do_readinterval
+				{ "readinterval", do_readinterval, 0, 1, 0 }, // 
 				{ "readall", do_readall, 0, 1, 0 }, //
 				{ "readlast", do_readlast, 0, 1, 0 }, // 
 				{ "remove", do_remove, 0, 1, 0 }, //
+				{ "ri", do_readinterval, 0, 1, 0 }, // 
 				{ "save", do_save, 0, 1, 1 }, // 
 				{ "set", do_set, 0, 1, 0 }, // 
 				{ "search", do_search, 0, 1, 0 }, // 
@@ -94,6 +100,7 @@ const struct cmd_type cmd_table [] = { //
 				{ "time", do_time, 0, 1, 1 }, // 
 				{ "title", do_title, 0, 1, 0 }, // 
 				{ "toggle", do_toggle, 0, 1, 0 }, // 
+				{ "q", do_qui, 0, 1, 1 }, // 
 				{ "quit", do_quit, 0, 1, 1 }, // 
 				{ "unalias", do_unalias, 0, 1, 0 }, // 
 				{ "unflash", do_unflash, 0, 1, 1 }, // 
@@ -102,6 +109,7 @@ const struct cmd_type cmd_table [] = { //
 				{ "version", do_version, 0, 1, 1 }, // 
 				{ "who", do_who, 0, 1, 1 }, // 
 				{ "Who", do_Who, 0, 1, 1 }, // 
+				{ "Who_old", do_Who_old, 0, 1, 1 }, // 
 				{ "whoami", do_whoami, 0, 1, 1 }, // 
 				{ "x", do_x, 0, 1, 0 }, //
 				{ "xers", do_xers, 0, 1, 1 }, // 
@@ -116,7 +124,10 @@ const struct cmd_type cmd_table [] = { //
 				{ "fr2tr", do_fr2tr, 0, 1, 1 }, //
 				{ "tr2fr", do_tr2fr, 0, 1, 1 }, //
 				{ "tr2tr", do_tr2tr, 0, 1, 1 }, //
-
+				{ "dict", do_dict, 0, 1, 1 }, //
+				{ "exchange", do_disp_exchange, 0, 1, 1 }, //
+				{ "charset", do_charset, 0, 1, 1 }, //
+				{ "fc", do_say, 0, 1, 1 }, //
 				/*
 				 * Moderator commands.
 				 */
@@ -134,7 +145,7 @@ const struct cmd_type cmd_table [] = { //
 				{ "deluser", do_deluser, 3, 1, 0 }, // 
 				{ "disconnect", do_disconnect, 3, 1, 0 }, // 
 				{ "echo", do_echo, 3, 1, 0 }, // 
-				{ "yalama", do_yalama, 3, 1, 0 }, // 
+				//{ "yalama", do_yalama, 3, 1, 0 }, // 
 				{ "force", do_force, 3, 1, 0 }, // 
 				{ "forumset", do_setforum, 3, 1, 0 }, // 
 				{ "hostname", do_hostname, 3, 1, 0 }, // 
@@ -158,7 +169,8 @@ const struct cmd_type cmd_table [] = { //
 				{ "showmods", do_showmods, 3, 1, 0 }, //
 				{ "statforum", do_statforum, 3, 1, 0 }, //
 				{ "banishes", do_banishes, 0, 1, 0 }, //
-
+				{ "loadfeeling", do_loadfeeling, 3, 1, 0 }, //
+				{ "loadhelps", do_loadhelp, 3, 1, 0 }, //
 				{ "", 0, 0, 0, 1 } };
 
 /*
@@ -199,28 +211,28 @@ void process_command(USER_DATA *usr, char *argument) {
 
 	if (!found) {
 		if (is_turkish(usr))
-			send_to_user("Gecersiz komut.\n\r", usr);
+			send_to_user("Gecersiz komut.\r\n", usr);
 		else
-			send_to_user("Unknown command.\n\r", usr);
+			send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (!is_moderator(usr) && cmd_table[cmd].show == 2) {
 		if (is_turkish(usr))
-			send_to_user("Gecersiz komut.\n\r", usr);
+			send_to_user("Gecersiz komut.\r\n", usr);
 		else
-			send_to_user("Unknown command.\n\r", usr);
+			send_to_user("Unknown command.\r\n", usr);
 		return;
 	}
 
 	if (!usr->Validated && cmd_table[cmd].valid == 0) {
 		if (is_turkish(usr)) {
 			send_to_user(
-					"Validate edilmemis kullanicisiniz.  Bu komutu kullanamazsiniz.\n\r",
+					"Validate edilmemis kullanicisiniz.  Bu komutu kullanamazsiniz.\r\n",
 					usr);
 		} else {
 			send_to_user("You are not validated yet.  "
-				"You cannot use that command.\n\r", usr);
+				"You cannot use that command.\r\n", usr);
 		}
 		return;
 	}
@@ -241,7 +253,7 @@ void do_cls(USER_DATA *usr, char *argument) {
 	} else {
 		int i;
 		for (i = 0; i < usr->desc->rows / 2; i++) {
-			send_to_user("\n\r", usr);
+			send_to_user("\r\n", usr);
 		}
 	}
 
@@ -270,9 +282,9 @@ void do_quit_org(USER_DATA *usr, char *argument, bool fXing) {
 
 	if (found && fXing) {
 		if (is_turkish(usr))
-			sprintf(buf1, "%s size x mesaji atiyor.\n\r", buf2);
+			sprintf(buf1, "%s size x mesaji atiyor.\r\n", buf2);
 		else
-			sprintf(buf1, "%s%s x'ing you.\n\r", buf2, (total_xers > 1) ? "are"
+			sprintf(buf1, "%s%s x'ing you.\r\n", buf2, (total_xers > 1) ? "are"
 					: "is");
 		send_to_user(buf1, usr);
 		EDIT_MODE(usr) = EDITOR_QUIT_ANSWER;
@@ -289,6 +301,7 @@ void do_quit_org(USER_DATA *usr, char *argument, bool fXing) {
 		cmd_chat_exit(usr);
 
 	do_help(usr, "logout");
+	print_to_user(usr, "\033]0;Goodbye from %s; come back soon!\007", config.bbs_name);
 	sprintf(log_buf, "%s has left the bbs", usr->name);
 	log_string(log_buf);
 	syslog(log_buf, usr);
@@ -304,6 +317,10 @@ void do_quit_org(USER_DATA *usr, char *argument, bool fXing) {
 	return;
 }
 
+void do_qui(USER_DATA *usr, char *argument) {
+	send_to_user("Please type #Yquit#x to exit.\r\n", usr);
+}
+
 void do_quit(USER_DATA *usr, char *argument) {
 	do_quit_org(usr, argument, TRUE);
 }
@@ -316,9 +333,9 @@ void do_time(USER_DATA *usr, char *argument) {
 	strtime[strlen(strtime)-1] = '\0';
 
 	if (is_turkish(usr))
-		sprintf(buf, "Sistem tarihi (%s): %s\n\r", config.bbs_state, strtime);
+		sprintf(buf, "Sistem tarihi (%s): %s\r\n", config.bbs_state, strtime);
 	else
-		sprintf(buf, "The system time is (%s): %s\n\r", config.bbs_state,
+		sprintf(buf, "The system time is (%s): %s\r\n", config.bbs_state,
 				strtime);
 	send_to_user(buf, usr);
 	return;
@@ -348,9 +365,9 @@ void do_help(USER_DATA *usr, char *argument) {
 
 	if (!found) {
 		if (is_turkish(usr))
-			send_to_user("Bu kelime hakkinda bir yardim yok.\n\r", usr);
+			send_to_user("Bu kelime hakkinda bir yardim yok.\r\n", usr);
 		else
-			send_to_user("No help on that word.\n\r", usr);
+			send_to_user("No help on that word.\r\n", usr);
 		return;
 	}
 
@@ -362,7 +379,7 @@ void do_help(USER_DATA *usr, char *argument) {
 void do_version(USER_DATA *usr, char *argument) {
 	char buf[INPUT];
 
-	sprintf(buf, "%s BBS version %s.\n\r", config.bbs_name, config.bbs_version);
+	sprintf(buf, "%s BBS version %s.\r\n", config.bbs_name, config.bbs_version);
 	send_to_user(buf, usr);
 	return;
 }
@@ -371,20 +388,51 @@ void do_whoami(USER_DATA *usr, char *argument) {
 	char buf[INPUT];
 
 	if (is_turkish(usr))
-		sprintf(buf, "%s.\n\r", usr->name);
+		sprintf(buf, "%s.\r\n", usr->name);
 	else
-		sprintf(buf, "You are %s.\n\r", usr->name);
+		sprintf(buf, "You are %s.\r\n", usr->name);
 	send_to_user(buf, usr);
 	return;
 }
 
 void do_save(USER_DATA *usr, char *argument) {
-	save_user(usr);
+save_user(usr);
 	if (is_turkish(usr))
-		send_to_user("Kaydedildi.\n\r", usr);
+		send_to_user("Kaydedildi.\r\n", usr);
 	else
-		send_to_user("Ok.\n\r", usr);
+		send_to_user("Ok.\r\n", usr);
 	return;
+}
+
+void do_charset(USER_DATA *usr, char *argument) {
+  char buf[INPUT];     
+	if (argument[0] == '\0') {
+		if (is_turkish(usr))
+			sprintf(buf, "Charset: %s#x\r\n", usr->clientCharset);
+		else
+			sprintf(buf, "#WYour charset is: #C%s#x\r\n", usr->clientCharset);
+		send_to_user(buf, usr);
+		return;
+	}
+	
+	smash_tilde(argument);
+
+	const char *cset = checkCharset(argument);
+
+	if (cset)
+	{
+    free_string(usr->clientCharset);
+  	usr->clientCharset = str_dup(cset);
+  	if (is_turkish(usr))
+  		sprintf(buf, "Yeni karakter setiniz: %s#x\r\n", usr->clientCharset);
+  	else
+  		sprintf(buf, "#WYour CharSet is now: #C%s#x\r\n", usr->clientCharset);
+  }
+  else
+  {
+    sprintf(buf,"#RThat's not a valid character set!#x\r\n");
+  }
+	send_to_user(buf, usr);
 }
 
 void do_set(USER_DATA *usr, char *argument) {
@@ -396,25 +444,27 @@ void do_set(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (is_turkish(usr))
-			sprintf(buf, "#cGercek isim:       #C: #W%s\n\r"
-				"#CTitle              #C: #W%s\n\r"
-				"#cE-mail             #C: #W%s\n\r"
-				"#CAlt#cernatif E-mail  #C: #W%s\n\r"
-				"#cHomepage #CUrl       #C: #W%s\n\r"
-				"#CICQ #cNumarasi       #C: #W%s\n\r"
-				"#CIdle #cMesaji        #C: #W%s#x\n\r", usr->real_name,
+			sprintf(buf, "#cGercek isim:       #C: #W%s\r\n"
+				"#CTitle              #C: #W%s#x\r\n"
+				"#cE-mail             #C: #W%s#x\r\n"
+				"#CAlt#cernatif E-mail  #C: #W%s#x\r\n"
+				"#cHomepage #CUrl       #C: #W%s#x\r\n"
+				"#CICQ #cNumarasi       #C: #W%s#x\r\n"
+				"#CIdle #cMesaji        #C: #W%s#x\r\n"
+        "#CCharser            #C: #W%s#x\r\n", usr->real_name,
 					usr->title, usr->email, usr->alt_email, usr->home_url,
-					usr->icquin, usr->idlemsg);
+					usr->icquin, usr->idlemsg, usr->clientCharset);
 		else
-			sprintf(buf, "#cReal name          #C: #W%s\n\r"
-				"#CTitle              #C: #W%s\n\r"
-				"#cE-mail             #C: #W%s\n\r"
-				"#CAlt#cernative E-mail #C: #W%s\n\r"
-				"#cHomepage #CUrl       #C: #W%s\n\r"
-				"#CICQ #cNumber         #C: #W%s\n\r"
-				"#CIdle #cMessage       #C: #W%s#x\n\r", usr->real_name,
+			sprintf(buf, "#cReal name          #C: #W%s#x\r\n"
+				"#CTitle              #C: #W%s#x\r\n"
+				"#cE-mail             #C: #W%s#x\r\n"
+				"#CAlt#cernative E-mail #C: #W%s#x\r\n"
+				"#cHomepage #CUrl       #C: #W%s#x\r\n"
+				"#CICQ #cNumber         #C: #W%s#x\r\n"
+				"#CIdle #cMessage       #C: #W%s#x\r\n"
+        "#CCharSet            #C: #W%s#x\r\n", usr->real_name,
 					usr->title, usr->email, usr->alt_email, usr->home_url,
-					usr->icquin, usr->idlemsg);
+					usr->icquin, usr->idlemsg, usr->clientCharset);
 		send_to_user(buf, usr);
 		return;
 	}
@@ -422,9 +472,9 @@ void do_set(USER_DATA *usr, char *argument) {
 	if (!str_cmp(arg, "alt")) {
 		if (argument[0] == '\0') {
 			if (is_turkish(usr))
-				send_to_user("Bilgi vermelisiniz.\n\r", usr);
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
 			else
-				send_to_user("You must give an argument.\n\r", usr);
+				send_to_user("You must give an argument.\r\n", usr);
 			return;
 		}
 
@@ -432,25 +482,25 @@ void do_set(USER_DATA *usr, char *argument) {
 			free_string(usr->alt_email);
 			usr->alt_email = str_dup("NONE");
 			if (is_turkish(usr))
-				send_to_user("Tamam.\n\r", usr);
+				send_to_user("Tamam.\r\n", usr);
 			else
-				send_to_user("Ok.\n\r", usr);
+				send_to_user("Ok.\r\n", usr);
 			return;
 		}
 
 		if (!(host = strchr(argument, '@'))) {
 			if (is_turkish(usr))
-				send_to_user("Gecersiz e-mail adresi.\n\r", usr);
+				send_to_user("Gecersiz e-mail adresi.\r\n", usr);
 			else
-				send_to_user("That's not a valid e-mail.\n\r", usr);
+				send_to_user("That's not a valid e-mail.\r\n", usr);
 			return;
 		}
 
 		if (strlen(argument) > 50) {
 			if (is_turkish(usr))
-				send_to_user("Degisken cok uzun.\n\r", usr);
+				send_to_user("Degisken cok uzun.\r\n", usr);
 			else
-				send_to_user("Argument is too long.\n\r", usr);
+				send_to_user("Argument is too long.\r\n", usr);
 			return;
 		}
 
@@ -458,27 +508,38 @@ void do_set(USER_DATA *usr, char *argument) {
 		free_string(usr->alt_email);
 		usr->alt_email = str_dup(argument);
 		if (is_turkish(usr))
-			send_to_user("Tamam.\n\r", usr);
+			send_to_user("Tamam.\r\n", usr);
 		else
-			send_to_user("Ok.\n\r", usr);
+			send_to_user("Ok.\r\n", usr);
 		return;
 	} else if (!str_cmp(arg, "title")) {
 		if (argument[0] == '\0') {
 			if (is_turkish(usr))
-				send_to_user("Bilgi vermelisiniz.\n\r", usr);
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
 			else
-				send_to_user("You must give an argument.\n\r", usr);
+				send_to_user("You must give an argument.\r\n", usr);
 			return;
 		}
 
 		do_title(usr, argument);
 		return;
+	} else if (!str_cmp(arg, "charset")) {
+		if (argument[0] == '\0') {
+			if (is_turkish(usr))
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
+			else
+				send_to_user("You must give an argument.\r\n", usr);
+			return;
+		}
+
+		do_charset(usr, argument);
+		return;
 	} else if (!str_cmp(arg, "url")) {
 		if (argument[0] == '\0') {
 			if (is_turkish(usr))
-				send_to_user("Bilgi vermelisiniz.\n\r", usr);
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
 			else
-				send_to_user("You must give an argument.\n\r", usr);
+				send_to_user("You must give an argument.\r\n", usr);
 			return;
 		}
 
@@ -486,17 +547,17 @@ void do_set(USER_DATA *usr, char *argument) {
 			free_string(usr->home_url);
 			usr->home_url = str_dup("NONE");
 			if (is_turkish(usr))
-				send_to_user("Tamam.\n\r", usr);
+				send_to_user("Tamam.\r\n", usr);
 			else
-				send_to_user("Ok.\n\r", usr);
+				send_to_user("Ok.\r\n", usr);
 			return;
 		}
 
 		if (strlen(argument) > 100) {
 			if (is_turkish(usr))
-				send_to_user("Degisken cok uzun.\n\r", usr);
+				send_to_user("Degisken cok uzun.\r\n", usr);
 			else
-				send_to_user("Argument is too long.\n\r", usr);
+				send_to_user("Argument is too long.\r\n", usr);
 			return;
 		}
 
@@ -504,16 +565,16 @@ void do_set(USER_DATA *usr, char *argument) {
 		free_string(usr->home_url);
 		usr->home_url = str_dup(argument);
 		if (is_turkish(usr))
-			send_to_user("Tamam.\n\r", usr);
+			send_to_user("Tamam.\r\n", usr);
 		else
-			send_to_user("Ok.\n\r", usr);
+			send_to_user("Ok.\r\n", usr);
 		return;
 	} else if (!str_cmp(arg, "icq")) {
 		if (argument[0] == '\0') {
 			if (is_turkish(usr))
-				send_to_user("Bilgi vermelisiniz.\n\r", usr);
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
 			else
-				send_to_user("You must give an argument.\n\r", usr);
+				send_to_user("You must give an argument.\r\n", usr);
 			return;
 		}
 
@@ -521,25 +582,25 @@ void do_set(USER_DATA *usr, char *argument) {
 			free_string(usr->icquin);
 			usr->icquin = str_dup("NONE");
 			if (is_turkish(usr))
-				send_to_user("Tamam.\n\r", usr);
+				send_to_user("Tamam.\r\n", usr);
 			else
-				send_to_user("Ok.\n\r", usr);
+				send_to_user("Ok.\r\n", usr);
 			return;
 		}
 
 		if (!is_number(argument)) {
 			if (is_turkish(usr))
-				send_to_user("Gecersiz ICQ numarasi.\n\r", usr);
+				send_to_user("Gecersiz ICQ numarasi.\r\n", usr);
 			else
-				send_to_user("That's not a valid ICQ number.\n\r", usr);
+				send_to_user("That's not a valid ICQ number.\r\n", usr);
 			return;
 		}
 
 		if (atoi(argument) > 99999999 || atoi(argument) < 10000) {
 			if (is_turkish(usr))
-				send_to_user("Gecersiz ICQ numarasi.\n\r", usr);
+				send_to_user("Gecersiz ICQ numarasi.\r\n", usr);
 			else
-				send_to_user("That's not a valid ICQ number.\n\r", usr);
+				send_to_user("That's not a valid ICQ number.\r\n", usr);
 			return;
 		}
 
@@ -547,16 +608,16 @@ void do_set(USER_DATA *usr, char *argument) {
 		free_string(usr->icquin);
 		usr->icquin = str_dup(argument);
 		if (is_turkish(usr))
-			send_to_user("Tamam.\n\r", usr);
+			send_to_user("Tamam.\r\n", usr);
 		else
-			send_to_user("Ok.\n\r", usr);
+			send_to_user("Ok.\r\n", usr);
 		return;
 	} else if (!str_cmp(arg, "idle")) {
 		if (argument[0] == '\0') {
 			if (is_turkish(usr))
-				send_to_user("Bilgi vermelisiniz.\n\r", usr);
+				send_to_user("Bilgi vermelisiniz.\r\n", usr);
 			else
-				send_to_user("You must give an argument.\n\r", usr);
+				send_to_user("You must give an argument.\r\n", usr);
 			return;
 		}
 
@@ -564,17 +625,17 @@ void do_set(USER_DATA *usr, char *argument) {
 			free_string(usr->idlemsg);
 			usr->idlemsg = str_dup("NONE");
 			if (is_turkish(usr))
-				send_to_user("Tamam.\n\r", usr);
+				send_to_user("Tamam.\r\n", usr);
 			else
-				send_to_user("Ok.\n\r", usr);
+				send_to_user("Ok.\r\n", usr);
 			return;
 		}
 
 		if (strlen(argument) > 75) {
 			if (is_turkish(usr))
-				send_to_user("Degisken cok uzun.\n\r", usr);
+				send_to_user("Degisken cok uzun.\r\n", usr);
 			else
-				send_to_user("Argument is too long.\n\r", usr);
+				send_to_user("Argument is too long.\r\n", usr);
 			return;
 		}
 
@@ -582,18 +643,18 @@ void do_set(USER_DATA *usr, char *argument) {
 		free_string(usr->idlemsg);
 		usr->idlemsg = str_dup(argument);
 		if (is_turkish(usr))
-			send_to_user("Tamam.\n\r", usr);
+			send_to_user("Tamam.\r\n", usr);
 		else
-			send_to_user("Ok.\n\r", usr);
+			send_to_user("Ok.\r\n", usr);
 		return;
 	} else {
 		if (is_turkish(usr)) {
-			send_to_user("Gecersiz set degiskeni.\n\r", usr);
+			send_to_user("Gecersiz set degiskeni.\r\n", usr);
 			send_to_user(
-					"Gecerli degiskenler: title, alt, url, icq, idle.\n\r", usr);
+					"Gecerli degiskenler: title, alt, url, icq, idle.\r\n", usr);
 		} else {
-			send_to_user("That's not a valid set option.\n\r", usr);
-			send_to_user("Valid options are: title, alt, url, icq, idle.\n\r",
+			send_to_user("That's not a valid set option.\r\n", usr);
+			send_to_user("Valid options are: title, alt, url, icq, idle.\r\n",
 					usr);
 		}
 		return;
@@ -605,18 +666,18 @@ void do_title(USER_DATA *usr, char *argument) {
 
 	if (argument[0] == '\0') {
 		if (is_turkish(usr))
-			sprintf(buf, "Basliginiz: %s#x\n\r", usr->title);
+			sprintf(buf, "Basliginiz: %s#x\r\n", usr->title);
 		else
-			sprintf(buf, "Your title is: %s#x\n\r", usr->title);
+			sprintf(buf, "Your title is: %s#x\r\n", usr->title);
 		send_to_user(buf, usr);
 		return;
 	}
 
 	if (strlen_color(argument) > 52) {
 		if (is_turkish(usr))
-			send_to_user("Basliginiz cok uzun.\n\r", usr);
+			send_to_user("Basliginiz cok uzun.\r\n", usr);
 		else
-			send_to_user("Title is too long.\n\r", usr);
+			send_to_user("Title is too long.\r\n", usr);
 		return;
 	}
 
@@ -624,13 +685,15 @@ void do_title(USER_DATA *usr, char *argument) {
 	free_string(usr->title);
 	usr->title = str_dup(argument);
 	if (is_turkish(usr))
-		sprintf(buf, "Yeni basliginiz: %s#x\n\r", usr->title);
+		sprintf(buf, "Yeni basliginiz: %s#x\r\n", usr->title);
 	else
-		sprintf(buf, "Your title is now: %s#x\n\r", usr->title);
+		sprintf(buf, "Your title is now: %s#x\r\n", usr->title);
 	send_to_user(buf, usr);
 	return;
 }
-
+/*
+extras.cpp içine taþýndý..
+**************************
 void do_who(USER_DATA *usr, char *argument) {
 	char buf[STRING];
 	BUFFER *output;
@@ -667,9 +730,9 @@ void do_who(USER_DATA *usr, char *argument) {
 			return;
 		} else {
 			if (is_turkish(usr))
-				sprintf(buf, "Gecersiz opsiyon %s.\n\r", arg);
+				sprintf(buf, "Gecersiz opsiyon %s.\r\n", arg);
 			else
-				sprintf(buf, "Unknown option %s.\n\r", arg);
+				sprintf(buf, "Unknown option %s.\r\n", arg);
 			send_to_user(buf, usr);
 			return;
 		}
@@ -682,13 +745,13 @@ void do_who(USER_DATA *usr, char *argument) {
 	strtime = ctime(&current_time);
 	strtime[strlen(strtime)-1] = '\0';
 	if (is_turkish(usr))
-		sprintf(buf_time, "#WKullanici       Zaman  Baslik\n\r");
+		sprintf(buf_time, "#WKullanici       Zaman  Baslik\r\n");
 	else
-		sprintf(buf_time, "#WNickname        Time   Title\n\r");
+		sprintf(buf_time, "#WNickname        Time   Title\r\n");
 	add_buf(output, buf_time);
 	add_buf(
 			output,
-			"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#x\n\r");
+			"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#x\r\n");
 
 	for (d = desc_list; d != NULL; d = d->next) {
 		if ((d->login != CON_LOGIN) || !USR(d) || (IS_TOGGLE(USR(d), TOGGLE_INVIS) && !IS_ADMIN(usr)) || (!USR(d)->Validated && !IS_ADMIN(usr)))
@@ -713,7 +776,7 @@ void do_who(USER_DATA *usr, char *argument) {
 		else
 			sprintf(buf_idle_mn, "0%d", idle_mn);
 
-		sprintf(buf, "%s%-12s #R%s%s%s #y%s:%s  #x%-35s#x\n\r", is_friend(usr, 
+		sprintf(buf, "%s%-12s #R%s%s%s #y%s:%s  #x%-35s#x\r\n", is_friend(usr, 
 		USR(d)->name) ? "#C" : is_notify(usr, USR(d)->name) ? "#G" : is_enemy(usr, USR(d)->name) ? "#R" : !d->user->Validated ? "#D" : "#Y", 
 		USR(d)->name, 
 		IS_TOGGLE(USR(d), TOGGLE_IDLE) ? "%" : " ", 
@@ -726,35 +789,35 @@ void do_who(USER_DATA *usr, char *argument) {
 		if (bFriend) {
 			if (is_turkish(usr))
 				send_to_user(
-						"Friend listenizde kayitli, aktif kullanici bulunamadi.\n\r",
+						"Friend listenizde kayitli, aktif kullanici bulunamadi.\r\n",
 						usr);
 			else
 				send_to_user(
-						"None of the users in your friend list is online.\n\r",
+						"None of the users in your friend list is online.\r\n",
 						usr);
 		} else if (bNotify) {
 			if (is_turkish(usr))
 				send_to_user(
-						"Notify listenizde kayitli, aktif kullanici bulunamadi.\n\r",
+						"Notify listenizde kayitli, aktif kullanici bulunamadi.\r\n",
 						usr);
 			else
 				send_to_user(
-						"None of the users in your notify list is online.\n\r",
+						"None of the users in your notify list is online.\r\n",
 						usr);
 		} else if (bEnemy) {
 			if (is_turkish(usr))
 				send_to_user(
-						"Enemy listenizde kayitli, aktif kullanici bulunamadi.\n\r",
+						"Enemy listenizde kayitli, aktif kullanici bulunamadi.\r\n",
 						usr);
 			else
 				send_to_user(
-						"None of the users in your enemy list is online.\n\r",
+						"None of the users in your enemy list is online.\r\n",
 						usr);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Aktif kullanici yok.\n\r", usr);
+				send_to_user("Aktif kullanici yok.\r\n", usr);
 			else
-				send_to_user("None.\n\r", usr);
+				send_to_user("None.\r\n", usr);
 		}
 
 		free_buf(output);
@@ -763,17 +826,18 @@ void do_who(USER_DATA *usr, char *argument) {
 
 	add_buf(
 			output,
-			"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#x\n\r");
+			"#W=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=#x\r\n");
 	if (is_turkish(usr))
-		sprintf(buf, "#GToplam #Y%d #Gkullanici#x\n\r", nMatch);
+		sprintf(buf, "#GToplam #Y%d #Gkullanici#x\r\n", nMatch);
 	else
-		sprintf(buf, "#GThere %s #Y%d #Guser%s#x\n\r", (nMatch > 1) ? "are"
+		sprintf(buf, "#GThere %s #Y%d #Guser%s#x\r\n", (nMatch > 1) ? "are"
 				: "is", nMatch, (nMatch > 1) ? "s" : "");
 	add_buf(output, buf);
 	page_to_user(buf_string(output), usr);
 	free_buf(output);
 	return;
 }
+*/
 
 void do_toggle(USER_DATA *usr, char *argument) {
 	char buf[STRING];
@@ -783,14 +847,17 @@ void do_toggle(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (is_turkish(usr))
-			sprintf(buf, "#CX #cmesaji        #C: %s\n\r"
-				"#CBeep            #C: %s\n\r"
-				"#CRenk #cdestegi    #C: %s\n\r"
-				"#CIdle #cmodu       #C: %s\n\r"
-				"#CNotify          #C: %s\n\r"
-				"#CAuto #cXers       #C: %s\n\r"
-				"#CFeeling         #C: %s\n\r"
-				"#cAuto#Cjump        #C: %s\n\r", 
+			sprintf(buf, "#CX #cmesaji        #C: %s\r\n"
+				"#CBeep            #C: %s\r\n"
+				"#CRenk #cdestegi    #C: %s\r\n"
+				"#CIdle #cmodu       #C: %s\r\n"
+				"#CNotify          #C: %s\r\n"
+				"#CAuto #cXers       #C: %s\r\n"
+				"#CFeeling         #C: %s\r\n"
+				"#CMore #cmesaji     #C: %s\r\n"
+				"#cAuto#Cjump        #C: %s\r\n" 
+				"#cSohbet        #C: %s\r\n" 
+				"#cYardim        #C: %s\r\n", 
 			IS_TOGGLE(usr, TOGGLE_XING) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_BEEP) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_ANSI) ? "#WAcik" : "#RKapali", 
@@ -798,16 +865,22 @@ void do_toggle(USER_DATA *usr, char *argument) {
 			IS_TOGGLE(usr, TOGGLE_INFO) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_WARN) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_FEEL) ? "#WAcik" : "#RKapali", 
-			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WAcik" : "#RKapali");
+			!IS_TOGGLE(usr, TOGGLE_MORE) ? "#WAcik" : "#RKapali", 
+			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WAcik" : "#RKapali",
+			IS_TOGGLE(usr, TOGGLE_SAY) ? "#WAcik" : "#RKapali",
+			IS_TOGGLE(usr, TOGGLE_HELP) ? "#WAcik" : "#RKapali");
 		else
-			sprintf(buf, "#cMessage e#CX#cpress #C: %s\n\r"
-				"#CBeep            #C: %s\n\r"
-				"#CAnsi #ccolor      #C: %s\n\r"
-				"#CIdle #cmode       #C: %s\n\r"
-				"#CNotify          #C: %s\n\r"
-				"#CAuto #cXers       #C: %s\n\r"
-				"#CFeeling         #C: %s\n\r"
-				"#cAuto#Cjump        #C: %s\n\r", 
+			sprintf(buf, "#cMessage e#CX#cpress #C: %s\r\n"
+				"#CBeep            #C: %s\r\n"
+				"#CAnsi #ccolor      #C: %s\r\n"
+				"#CIdle #cmode       #C: %s\r\n"
+				"#CNotify          #C: %s\r\n"
+				"#CAuto #cXers       #C: %s\r\n"
+				"#CFeeling         #C: %s\r\n"
+				"#CMore #cmessage    #C: %s\r\n"
+				"#cAuto#Cjump        #C: %s\r\n" 
+				"#cForum #CChat      #C: %s\r\n" 
+				"#CHelp            #C: %s\r\n", 
 			IS_TOGGLE(usr, TOGGLE_XING) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_BEEP) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_ANSI) ? "#WOn" : "#ROff", 
@@ -815,10 +888,13 @@ void do_toggle(USER_DATA *usr, char *argument) {
 			IS_TOGGLE(usr, TOGGLE_INFO) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_WARN) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_FEEL) ? "#WOn" : "#ROff", 
-			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WOn" : "#ROff");
+			!IS_TOGGLE(usr, TOGGLE_MORE) ? "#WOn" : "#ROff", 
+			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WOn" : "#ROff",
+			IS_TOGGLE(usr, TOGGLE_SAY) ? "#WOn" : "#ROff",
+			IS_TOGGLE(usr, TOGGLE_HELP) ? "#WOn" : "#ROff");
 		send_to_user(buf, usr);
 		if (IS_ADMIN(usr)) {
-			sprintf(buf, "#CAdm#cin channel   #C: %s#x\n\r", 
+			sprintf(buf, "#CAdm#cin channel   #C: %s#x\r\n", 
 			IS_TOGGLE(usr, TOGGLE_ADM) ? "#WOn" : "#ROff");
 			send_to_user(buf, usr);
 		}
@@ -826,143 +902,182 @@ void do_toggle(USER_DATA *usr, char *argument) {
 	} else if (!str_cmp(arg, "x")) {
 		if (IS_TOGGLE(usr, TOGGLE_XING)) {
 			if (is_turkish(usr))
-				send_to_user("X mesaji degiskeni Kapatildi.\n\r", usr);
+				send_to_user("X mesaji degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle message eXpress Off.\n\r", usr);
+				send_to_user("You toggle message eXpress Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_XING);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("X mesaji degiskeni Acildi.\n\r", usr);
+				send_to_user("X mesaji degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle message eXpress On.\n\r", usr);
+				send_to_user("You toggle message eXpress On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_XING);
 		}
 		return;
 	} else if (!str_cmp(arg, "beep")) {
 		if (IS_TOGGLE(usr, TOGGLE_BEEP)) {
 			if (is_turkish(usr))
-				send_to_user("Beep degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Beep degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle beep Off.\n\r", usr);
+				send_to_user("You toggle beep Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_BEEP);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Beep degiskeni Acildi.\n\r", usr);
+				send_to_user("Beep degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle beep On.\n\r", usr);
+				send_to_user("You toggle beep On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_BEEP);
+		}
+		return;
+	} else if (!str_cmp(arg, "more")) {
+		if (!IS_TOGGLE(usr, TOGGLE_MORE)) {
+			if (is_turkish(usr))
+				send_to_user("More degiskeni Kapatildi.\r\n", usr);
+			else
+				send_to_user("You toggle \"More\" Off.\r\n", usr);
+			SET_TOGGLE(usr, TOGGLE_MORE);
+		} else {
+			if (is_turkish(usr))
+				send_to_user("More degiskeni Acildi.\r\n", usr);
+			else
+				send_to_user("You toggle \"More\" On.\r\n", usr);
+			REM_TOGGLE(usr, TOGGLE_MORE);
 		}
 		return;
 	} else if ((!str_cmp(arg, "renk") && is_turkish(usr)) || !str_cmp(arg,
 			"ansi")) {
 		if (IS_TOGGLE(usr, TOGGLE_ANSI)) {
 			if (is_turkish(usr))
-				send_to_user("Renk destegi degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Renk destegi degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle ansi color Off.\n\r", usr);
+				send_to_user("You toggle ansi color Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_ANSI);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Renk destegi degiskeni Acildi.\n\r", usr);
+				send_to_user("Renk destegi degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle ansi color On.\n\r", usr);
+				send_to_user("You toggle ansi color On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_ANSI);
 		}
 		return;
 	} else if (!str_cmp(arg, "idle")) {
 		if (IS_TOGGLE(usr, TOGGLE_IDLE)) {
 			if (is_turkish(usr))
-				send_to_user("Idle modu degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Idle modu degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle idle mode Off.\n\r", usr);
+				send_to_user("You toggle idle mode Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_IDLE);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Idle modu degiskeni Acildi.\n\r", usr);
+				send_to_user("Idle modu degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle idle mode On.\n\r", usr);
+				send_to_user("You toggle idle mode On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_IDLE);
 		}
 		return;
 	} else if (!str_cmp(arg, "notify")) {
 		if (IS_TOGGLE(usr, TOGGLE_INFO)) {
 			if (is_turkish(usr))
-				send_to_user("Notify degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Notify degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle notify Off.\n\r", usr);
+				send_to_user("You toggle notify Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_INFO);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Notify degiskeni Acildi.\n\r", usr);
+				send_to_user("Notify degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle notify On.\n\r", usr);
+				send_to_user("You toggle notify On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_INFO);
 		}
 		return;
 	} else if (!str_cmp(arg, "auto")) {
 		if (IS_TOGGLE(usr, TOGGLE_WARN)) {
 			if (is_turkish(usr))
-				send_to_user("Auto xers degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Auto xers degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle auto xers Off.\n\r", usr);
+				send_to_user("You toggle auto xers Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_WARN);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Auto xers degiskeni Acildi.\n\r", usr);
+				send_to_user("Auto xers degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle auto xers On.\n\r", usr);
+				send_to_user("You toggle auto xers On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_WARN);
 		}
 		return;
 	} else if (!str_cmp(arg, "feeling")) {
 		if (IS_TOGGLE(usr, TOGGLE_FEEL)) {
 			if (is_turkish(usr))
-				send_to_user("Feeling degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Feeling degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle feeling Off.\n\r", usr);
+				send_to_user("You toggle feeling Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_FEEL);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Feeling degiskeni Acildi.\n\r", usr);
+				send_to_user("Feeling degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle feeling On.\n\r", usr);
+				send_to_user("You toggle feeling On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_FEEL);
 		}
 		return;
 	} else if (!str_cmp(arg, "jump")) {
 		if (IS_TOGGLE(usr, TOGGLE_AUTOJUMP)) {
 			if (is_turkish(usr))
-				send_to_user("Autojump degiskeni Kapatildi.\n\r", usr);
+				send_to_user("Autojump degiskeni Kapatildi.\r\n", usr);
 			else
-				send_to_user("You toggle autojump Off.\n\r", usr);
+				send_to_user("You toggle autojump Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_AUTOJUMP);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Autojump degiskeni Acildi.\n\r", usr);
+				send_to_user("Autojump degiskeni Acildi.\r\n", usr);
 			else
-				send_to_user("You toggle autojump On.\n\r", usr);
+				send_to_user("You toggle autojump On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_AUTOJUMP);
+		}
+		return;
+	} else if (!str_cmp(arg, "help")) {
+		if (IS_TOGGLE(usr, TOGGLE_HELP)) {
+			if (is_turkish(usr))
+				send_to_user("Yardim Kapatildi.\r\n", usr);
+			else
+				send_to_user("You toggle help Off.\r\n", usr);
+			REM_TOGGLE(usr, TOGGLE_HELP);
+		} else {
+			if (is_turkish(usr))
+				send_to_user("Yardim Acildi.\r\n", usr);
+			else
+				send_to_user("You toggle help On.\r\n", usr);
+			SET_TOGGLE(usr, TOGGLE_HELP);
 		}
 		return;
 	} else if (!str_cmp(arg, "adm") && IS_ADMIN(usr)) {
 		if (IS_TOGGLE(usr, TOGGLE_ADM)) {
-			send_to_user("You toggle admin channel Off.\n\r", usr);
+			send_to_user("You toggle admin channel Off.\r\n", usr);
 			REM_TOGGLE(usr, TOGGLE_ADM);
 		} else {
-			send_to_user("You toggle admin channel On.\n\r", usr);
+			send_to_user("You toggle admin channel On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_ADM);
+		}
+		return;
+	} else if (!str_cmp(arg, "chat") ) {
+		if (IS_TOGGLE(usr, TOGGLE_SAY)) {
+			send_to_user("You toggle forum chat Off.\r\n", usr);
+			REM_TOGGLE(usr, TOGGLE_SAY);
+		} else {
+			send_to_user("You toggle forum chat On.\r\n", usr);
+			SET_TOGGLE(usr, TOGGLE_SAY);
 		}
 		return;
 	} else {
 		if (is_turkish(usr)) {
-			send_to_user("Gecersiz toggle degiskeni.\n\r", usr);
+			send_to_user("Gecersiz toggle degiskeni.\r\n", usr);
 			send_to_user(
-					"Gecerli degiskenler: x, beep, renk, idle, notify, auto, feeling, jump.\n\r",
+					"Gecerli degiskenler: x, beep, renk, idle, notify, auto, feeling, jump.\r\n",
 					usr);
 		} else {
-			send_to_user("That's not a valid toggle option.\n\r", usr);
+			send_to_user("That's not a valid toggle option.\r\n", usr);
 			send_to_user(
-					"Valid options are: x, beep, ansi, idle, notify, auto, feeling, jump.\n\r",
+					"Valid options are: x, beep, ansi, idle, notify, auto, feeling, jump.\r\n",
 					usr);
 		}
 		return;
@@ -976,22 +1091,22 @@ void do_hide(USER_DATA *usr, char *argument) {
 
 	if (arg[0] == '\0') {
 		if (is_turkish(usr))
-			print_to_user(usr, "#cGercek #Cisim        #C: %s\n\r"
-				"#CE-mail             #C: %s\n\r"
-				"#CAlt#cernatif E-mail  #C: %s\n\r"
-				"#CICQ #cNumarasi       #C: %s\n\r"
-				"#cHomepage #CUrl       #C: %s#x\n\r", 
+			print_to_user(usr, "#cGercek #Cisim        #C: %s\r\n"
+				"#CE-mail             #C: %s\r\n"
+				"#CAlt#cernatif E-mail  #C: %s\r\n"
+				"#CICQ #cNumarasi       #C: %s\r\n"
+				"#cHomepage #CUrl       #C: %s#x\r\n", 
 			IS_HIDE(usr, HIDE_REALNAME) ? "#WGizli" : "#RGizli Degil", 
 			IS_HIDE(usr, HIDE_EMAIL) ? "#WGizli" : "#RGizli Degil", 
 			IS_HIDE(usr, HIDE_ALTEMAIL) ? "#WGizli" : "#RGizli Degil", 
 			IS_HIDE(usr, HIDE_ICQ) ? "#WGizli" : "#RGizli Degil", 
 			IS_HIDE(usr, HIDE_HOMEPAGE) ? "#WGizli" : "#RGizli Degil");
 		else
-			print_to_user(usr, "#CReal #cname          #C: %s\n\r"
-				"#CE-mail             #C: %s\n\r"
-				"#CAlt#cernative E-mail #C: %s\n\r"
-				"#CICQ #cNumber         #C: %s\n\r"
-				"#cHomepage #CUrl       #C: %s#x\n\r", 
+			print_to_user(usr, "#CReal #cname          #C: %s\r\n"
+				"#CE-mail             #C: %s\r\n"
+				"#CAlt#cernative E-mail #C: %s\r\n"
+				"#CICQ #cNumber         #C: %s\r\n"
+				"#cHomepage #CUrl       #C: %s#x\r\n", 
 			IS_HIDE(usr, HIDE_REALNAME) ? "#WHidden" : "#RNot Hidden", 
 			IS_HIDE(usr, HIDE_EMAIL) ? "#WHidden" : "#RNot Hidden", 
 			IS_HIDE(usr, HIDE_ALTEMAIL) ? "#WHidden" : "#RNot Hidden", 
@@ -1002,30 +1117,30 @@ void do_hide(USER_DATA *usr, char *argument) {
 			"real")) {
 		if (IS_HIDE(usr, HIDE_REALNAME)) {
 			if (is_turkish(usr))
-				send_to_user("Gercek isminizin gizliligi kaldirildi.\n\r", usr);
+				send_to_user("Gercek isminizin gizliligi kaldirildi.\r\n", usr);
 			else
-				send_to_user("You unhide your real name.\n\r", usr);
+				send_to_user("You unhide your real name.\r\n", usr);
 			REM_HIDE(usr, HIDE_REALNAME);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Gercek isminiz gizlendi.\n\r", usr);
+				send_to_user("Gercek isminiz gizlendi.\r\n", usr);
 			else
-				send_to_user("You hide your real name.\n\r", usr);
+				send_to_user("You hide your real name.\r\n", usr);
 			SET_HIDE(usr, HIDE_REALNAME);
 		}
 		return;
 	} else if (!str_cmp(arg, "e-mail")) {
 		if (IS_HIDE(usr, HIDE_EMAIL)) {
 			if (is_turkish(usr))
-				send_to_user("E-mailinizin gizliligi kaldirildi.\n\r", usr);
+				send_to_user("E-mailinizin gizliligi kaldirildi.\r\n", usr);
 			else
-				send_to_user("You unhide your e-mail.\n\r", usr);
+				send_to_user("You unhide your e-mail.\r\n", usr);
 			REM_HIDE(usr, HIDE_EMAIL);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("E-mailiniz gizlendi.\n\r", usr);
+				send_to_user("E-mailiniz gizlendi.\r\n", usr);
 			else
-				send_to_user("You hide your e-mail.\n\r", usr);
+				send_to_user("You hide your e-mail.\r\n", usr);
 			SET_HIDE(usr, HIDE_EMAIL);
 		}
 		return;
@@ -1033,60 +1148,60 @@ void do_hide(USER_DATA *usr, char *argument) {
 		if (IS_HIDE(usr, HIDE_ALTEMAIL)) {
 			if (is_turkish(usr))
 				send_to_user(
-						"Alternatif e-mailinizin gizliligi kaldirildi.\n\r",
+						"Alternatif e-mailinizin gizliligi kaldirildi.\r\n",
 						usr);
 			else
-				send_to_user("You unhide your alternative e-mail.\n\r", usr);
+				send_to_user("You unhide your alternative e-mail.\r\n", usr);
 			REM_HIDE(usr, HIDE_ALTEMAIL);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Alternatif e-mailiniz gizlendi.\n\r", usr);
+				send_to_user("Alternatif e-mailiniz gizlendi.\r\n", usr);
 			else
-				send_to_user("You hide your alternative e-mail.\n\r", usr);
+				send_to_user("You hide your alternative e-mail.\r\n", usr);
 			SET_HIDE(usr, HIDE_ALTEMAIL);
 		}
 		return;
 	} else if (!str_cmp(arg, "icq")) {
 		if (IS_HIDE(usr, HIDE_ICQ)) {
 			if (is_turkish(usr))
-				send_to_user("ICQ numaranizin gizliligi kaldirildi.\n\r", usr);
+				send_to_user("ICQ numaranizin gizliligi kaldirildi.\r\n", usr);
 			else
-				send_to_user("You unhide your ICQ number.\n\r", usr);
+				send_to_user("You unhide your ICQ number.\r\n", usr);
 			REM_HIDE(usr, HIDE_ICQ);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("ICQ numaraniz gizlendi.\n\r", usr);
+				send_to_user("ICQ numaraniz gizlendi.\r\n", usr);
 			else
-				send_to_user("You hide your ICQ number.\n\r", usr);
+				send_to_user("You hide your ICQ number.\r\n", usr);
 			SET_HIDE(usr, HIDE_ICQ);
 		}
 		return;
 	} else if (!str_cmp(arg, "url")) {
 		if (IS_HIDE(usr, HIDE_HOMEPAGE)) {
 			if (is_turkish(usr))
-				send_to_user("Homepage urlnizin gizliligi kaldirildi.\n\r", usr);
+				send_to_user("Homepage urlnizin gizliligi kaldirildi.\r\n", usr);
 			else
-				send_to_user("You unhide your homepage url.\n\r", usr);
+				send_to_user("You unhide your homepage url.\r\n", usr);
 			REM_HIDE(usr, HIDE_HOMEPAGE);
 		} else {
 			if (is_turkish(usr))
-				send_to_user("Homepage urlniz gizlendi.\n\r", usr);
+				send_to_user("Homepage urlniz gizlendi.\r\n", usr);
 			else
-				send_to_user("You hide your homepage url.\n\r", usr);
+				send_to_user("You hide your homepage url.\r\n", usr);
 			SET_HIDE(usr, HIDE_HOMEPAGE);
 		}
 		return;
 	} else {
 		if (is_turkish(usr)) {
-			print_to_user(usr, "Gecersiz %s degiskeni.\n\r", !str_cmp(
+			print_to_user(usr, "Gecersiz %s degiskeni.\r\n", !str_cmp(
 					usr->lastCommand, "hide") ? "hide" : "unhide");
 			send_to_user(
-					"Gecerli degiskenler: isim, e-mail, alt, icq, url.\n\r",
+					"Gecerli degiskenler: isim, e-mail, alt, icq, url.\r\n",
 					usr);
 		} else {
-			print_to_user(usr, "That's not a valid %s option.\n\r", !str_cmp(
+			print_to_user(usr, "That's not a valid %s option.\r\n", !str_cmp(
 					usr->lastCommand, "hide") ? "hide" : "unhide");
-			send_to_user("Valid options are: real, e-mail, alt, icq, url.\n\r",
+			send_to_user("Valid options are: real, e-mail, alt, icq, url.\r\n",
 					usr);
 		}
 		return;
@@ -1148,9 +1263,9 @@ void do_age(USER_DATA *usr, char *argument) {
 	int second = (usr->used + (int) (current_time - usr->age));
 
 	if (is_turkish(usr))
-		sprintf(buf, "Kullanim sureniz: %s\n\r", get_age(second, FALSE));
+		sprintf(buf, "Kullanim sureniz: %s\r\n", get_age(second, FALSE));
 	else
-		sprintf(buf, "Your age is: %s\n\r", get_age(second, FALSE));
+		sprintf(buf, "Your age is: %s\r\n", get_age(second, FALSE));
 	send_to_user(buf, usr);
 	return;
 }
@@ -1166,20 +1281,20 @@ void do_plan(USER_DATA *usr, char *argument) {
 
 	if (strlen(usr->plan) > 0) {
 		if (is_turkish(usr))
-			sprintf(buf, "Su anki planiniz:\n\r%s\n\r", usr->plan);
+			sprintf(buf, "Su anki planiniz:\r\n%s\r\n", usr->plan);
 		else
-			sprintf(buf, "Your currently profile is:\n\r%s\n\r", usr->plan);
-		send_to_user_bw(buf, usr);
+			sprintf(buf, "Your currently profile is:\r\n%s\r\n", usr->plan);
+		send_to_user(buf, usr);
 		EDIT_MODE(usr) = EDITOR_PLAN_ANSWER;
 		return;
 	} else {
 		if (is_turkish(usr))
 			send_to_user(
-					"Planiniz icin 10 satir ayrilmistir. Kaydetmek icin '**',\n\riptal etmek icin '~q' yaziniz.\n\r",
+					"Planiniz icin 10 satir ayrilmistir. Kaydetmek icin '**',\r\niptal etmek icin '~q' yaziniz.\r\n",
 					usr);
 		else
 			send_to_user(
-					"You have max 10 lines for your profile.  Press ** to stop,\n\rpress '~q' to abort.\n\r",
+					"You have max 10 lines for your profile.  Press ** to stop,\r\npress '~q' to abort.\r\n",
 					usr);
 		EDIT_MODE(usr) = EDITOR_PLAN;
 		string_edit(usr, &usr->plan);
@@ -1201,11 +1316,11 @@ void edit_plan_answer(USER_DATA *usr, char *argument) {
 			usr->old_plan = usr->plan ? str_dup(usr->plan) : str_dup("*ERROR*");
 			if (is_turkish(usr))
 				send_to_user(
-						"Planiniz icin 10 satir ayrilmistir. Kaydetmek icin '**',\n\riptal etmek icin '~q' yaziniz.\n\r",
+						"Planiniz icin 10 satir ayrilmistir. Kaydetmek icin '**',\r\niptal etmek icin '~q' yaziniz.\r\n",
 						usr);
 			else
 				send_to_user(
-						"You have max 10 lines for your profile.  Press ** to stop,\n\rpress '~q' to abort.\n\r",
+						"You have max 10 lines for your profile.  Press ** to stop,\r\npress '~q' to abort.\r\n",
 						usr);
 			EDIT_MODE(usr) = EDITOR_PLAN;
 			string_edit(usr, &usr->plan);
@@ -1213,9 +1328,9 @@ void edit_plan_answer(USER_DATA *usr, char *argument) {
 
 		default:
 			if (is_turkish(usr))
-				send_to_user("Iptal edildi.\n\r", usr);
+				send_to_user("Iptal edildi.\r\n", usr);
 			else
-				send_to_user("Aborted.\n\r", usr);
+				send_to_user("Aborted.\r\n", usr);
 			EDIT_MODE(usr) = EDITOR_NONE;
 			break;
 	}
@@ -1259,7 +1374,7 @@ void edit_pwd_old(USER_DATA *usr, char *argument) {
 		}
 
 		write_to_buffer(usr->desc, echo_on, 0);
-		write_to_buffer(usr->desc, "\n\r", 0);
+		write_to_buffer(usr->desc, "\r\n", 0);
 		EDIT_MODE(usr) = EDITOR_NONE;
 		return;
 	}
@@ -1267,9 +1382,9 @@ void edit_pwd_old(USER_DATA *usr, char *argument) {
 	if (strcmp(crypt(argument, usr->password), usr->password)) {
 		write_to_buffer(usr->desc, echo_on, 0);
 		if (is_turkish(usr))
-			write_to_buffer(usr->desc, "\n\rYanlis sifre.\n\r", 0);
+			write_to_buffer(usr->desc, "\r\nYanlis sifre.\r\n", 0);
 		else
-			write_to_buffer(usr->desc, "\n\rWrong password.\n\r", 0);
+			write_to_buffer(usr->desc, "\r\nWrong password.\r\n", 0);
 		EDIT_MODE(usr) = EDITOR_NONE;
 		return;
 	}
@@ -1289,18 +1404,18 @@ void edit_pwd_new_one(USER_DATA *usr, char *argument) {
 	if (strlen(argument) < 5) {
 		if (is_turkish(usr))
 			write_to_buffer(usr->desc,
-					"\n\rSifre 5 karakterfen fazla olmali.\n\r", 0);
+					"\r\nSifre 5 karakterfen fazla olmali.\r\n", 0);
 		else
 			write_to_buffer(usr->desc,
-					"\n\rPassword must be at least 5 characters long.\n\r", 0);
+					"\r\nPassword must be at least 5 characters long.\r\n", 0);
 		return;
 	} else if (strlen(argument) > 12) {
 		if (is_turkish(usr))
 			write_to_buffer(usr->desc,
-					"\n\rSifre maksimum 12 karakter olmali.\n\r", 0);
+					"\r\nSifre maksimum 12 karakter olmali.\r\n", 0);
 		else
 			write_to_buffer(usr->desc,
-					"\n\rPassword must be maximum 12 characters.\n\r", 0);
+					"\r\nPassword must be maximum 12 characters.\r\n", 0);
 		return;
 	}
 
@@ -1308,9 +1423,9 @@ void edit_pwd_new_one(USER_DATA *usr, char *argument) {
 	for (password = password_new; *password != '\0'; password++) {
 		if (*password == '~') {
 			if (is_turkish(usr))
-				write_to_buffer(usr->desc, "\n\rSifre gecersiz.\n\r", 0);
+				write_to_buffer(usr->desc, "\r\nSifre gecersiz.\r\n", 0);
 			else
-				write_to_buffer(usr->desc, "\n\rPassword not acceptable.\n\r",
+				write_to_buffer(usr->desc, "\r\nPassword not acceptable.\r\n",
 						0);
 			return;
 		}
@@ -1330,18 +1445,18 @@ void edit_pwd_new_two(USER_DATA *usr, char *argument) {
 
 	if (strcmp(crypt(argument, usr->password), usr->password)) {
 		if (is_turkish(usr))
-			write_to_buffer(usr->desc, "\n\rSifreler ayni degil.\n\r", 0);
+			write_to_buffer(usr->desc, "\r\nSifreler ayni degil.\r\n", 0);
 		else
-			write_to_buffer(usr->desc, "\n\rPasswords don't match.\n\r", 0);
+			write_to_buffer(usr->desc, "\r\nPasswords don't match.\r\n", 0);
 		EDIT_MODE(usr) = EDITOR_PWD_NEW_ONE;
 		return;
 	}
 
 	write_to_buffer(usr->desc, echo_on, 0);
 	if (is_turkish(usr))
-		write_to_buffer(usr->desc, "\n\rTamam.\n\r", 0);
+		write_to_buffer(usr->desc, "\r\nTamam.\r\n", 0);
 	else
-		write_to_buffer(usr->desc, "\n\rOk.\n\r", 0);
+		write_to_buffer(usr->desc, "\r\nOk.\r\n", 0);
 	EDIT_MODE(usr) = EDITOR_NONE;
 	return;
 }
@@ -1360,11 +1475,63 @@ void do_uptime(USER_DATA *usr, char *argument) {
 	send_to_user(buf, usr);
 	uptime = (int) current_time - boot_time_t;
 	if (is_turkish(usr))
-		sprintf(buf, "%s BBS'in calisma suresi: %s.\n\r", config.bbs_name,
+		sprintf(buf, "\r%s BBS'in calisma suresi: %s.\r\n", config.bbs_name,
 				get_age(uptime, FALSE));
 	else
-		sprintf(buf, "%s BBS has passed %s online.\n\r", config.bbs_name,
+		sprintf(buf, "\r%s BBS has passed %s online.\r\n", config.bbs_name,
 				get_age(uptime, FALSE));
 	send_to_user(buf, usr);
 	return;
+} 
+
+void do_say(USER_DATA * usr, char *argument)
+{
+    char buf[STRING];
+    DESC_DATA *d;
+
+    if (!usr)
+	return;
+
+    if (!usr->pBoard)
+	return;
+
+    if (argument[0] == '\0') {
+	syntax("say [message]", usr);
+	return;
+    }
+
+    if (!IS_TOGGLE(usr, TOGGLE_SAY)) { 
+	syntax ("You did not toggle chat yet",usr);
+	return;
+    }
+    if (IS_TOGGLE(usr, TOGGLE_IDLE)) {
+	syntax("You are idle. Idle people should not chat!", usr);
+	return;
+    }
+
+    sprintf(buf, "[#Y%s#x][#C%s#x] %s#x\r\n", usr->pBoard->long_name, usr->name, argument);
+
+    for (d = desc_list; d; d = d->next) {
+	if (USR(d) && d->login == CON_LOGIN && USR(d)->Validated) {
+	    if (USR(d)->pBoard != usr->pBoard) {
+		continue;
+	    }
+            if (!IS_TOGGLE(USR(d), TOGGLE_SAY) || IS_TOGGLE(USR(d), TOGGLE_IDLE)  ) {
+		continue;
+	    }
+	    if (is_ignore(USR(d), usr->name, TRUE)) {
+		continue;
+	    }
+            if (is_ignore(usr, USR(d)->name, TRUE)) {
+                continue;
+            }
+
+	    if (isBusySelf(USR(d)))
+		add_buffer(USR(d), buf);
+	    else
+		send_to_user(buf, USR(d));
+	}
+    }
+
+    return;
 }

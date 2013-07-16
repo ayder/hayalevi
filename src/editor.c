@@ -311,7 +311,7 @@ void string_add( USER_DATA *usr, char *argument )
 
     smash_tilde(argument);
     strcat(buf, argument);
-    strcat(buf, "\n\r");
+    strcat(buf, "#x\n\r");
     free_string(*usr->desc->pString);
     *usr->desc->pString = str_dup(buf);
     EDIT_LINE(usr)++;

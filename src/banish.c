@@ -143,11 +143,11 @@ void save_banishes( void )
     BANISH_DATA *pBan;
     FILE *fpBan;
 
-    fclose(fpReserve);
+    //fclose(fpReserve);
     if (!(fpBan = fopen(BANISH_FILE, "w")))
     {
 	bbs_bug("Save_banishes: Could not open to write %s", BANISH_FILE);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
     }
 
@@ -167,7 +167,7 @@ void save_banishes( void )
 
     fprintf(fpBan, "END\n");
     fclose(fpBan);
-    fpReserve = fopen(NULL_FILE, "r");
+    //fpReserve = fopen(NULL_FILE, "r");
     return;
 }
 

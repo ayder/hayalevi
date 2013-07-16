@@ -21,6 +21,7 @@
  */
 
 #include <sys/types.h>
+#include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,18 +29,6 @@
 #include <ctype.h>
 
 #include "bbs.h"
-
-#define FEELING_HUG		0
-#define FEELING_KISS	1
-#define FEELING_SMILE	3
-#define FEELING_KICK	4
-#define FEELING_GRIN	5
-#define FEELING_NAH		6
-#define FEELING_SSEV	7
-#define FEELING_YALARIM	8
-#define FEELING_BYEBYE	9
-#define FEELING_POKE	10
-#define FEELING_GREET	11
 
 void remove_message(USER_DATA *usr) {
 	MESSAGE_DATA *pMessage;
@@ -170,7 +159,7 @@ void do_xing(USER_DATA *usr, char *argument, bool fXing) {
 				colorize(usr, x_usr->name));
 		send_to_user(buf, usr);
 		if (str_cmp(x_usr->idlemsg, "NONE")) {
-			send_to_user_bw(x_usr->idlemsg, usr);
+			send_to_user_c(x_usr->idlemsg, usr, FALSE);
 			send_to_user("\n\r", usr);
 		}
 		usr->xing_to = "*NONE*";
@@ -304,7 +293,7 @@ void edit_xing(USER_DATA *usr, char *argument) {
 					colorize(xing, usr->xing_to));
 			send_to_user(output, usr);
 			if (str_cmp(xing->idlemsg, "NONE")) {
-				send_to_user_bw(xing->idlemsg, usr);
+				send_to_user_c(xing->idlemsg, usr, FALSE);
 				send_to_user("\n\r", usr);
 			}
 			usr->xing_to = "*NONE*";
@@ -465,7 +454,7 @@ void edit_xing(USER_DATA *usr, char *argument) {
 
 	strcat(msg, "] ");
 	strcat(msg, buf);
-	strcat(msg, "\n\r");
+	strcat(msg, "#x\n\r");
 	free_string(usr->msg);
 	usr->msg = str_dup(msg);
 	EDIT_LINE(usr)++;
@@ -524,7 +513,7 @@ void edit_xing(USER_DATA *usr, char *argument) {
 					xing->name);
 			send_to_user(output, usr);
 			if (str_cmp(xing->idlemsg, "NONE")) {
-				send_to_user_bw(xing->idlemsg, usr);
+				send_to_user_c(xing->idlemsg, usr, FALSE);
 				send_to_user("\n\r", usr);
 			}
 			usr->xing_to = "*NONE*";
@@ -714,7 +703,7 @@ void do_mx(USER_DATA *usr, char *argument) {
 		return;
 	}
 
-	msg_to_user(buf, usr);
+	page_to_user_c(buf, usr, FALSE);
 	return;
 }
 
@@ -735,7 +724,7 @@ void do_bug(USER_DATA *usr, char *argument) {
 		fprintf(fpBug, "[%-12s] [%s]: %s\n", usr->name, usr->xing_time,
 				argument);
 		fclose(fpBug);
-		send_to_user("Ok. Thanks.\n\r", usr);
+		send_to_user("Darn!.. Really?.. Sorry about that.. But, we'll fix that in a jiffy. :)\n\r", usr);
 		return;
 	}
 }
@@ -757,7 +746,7 @@ void do_idea(USER_DATA *usr, char *argument) {
 		fprintf(fpIdea, "[%-12s] [%s]: %s\n", usr->name, usr->xing_time,
 				argument);
 		fclose(fpIdea);
-		send_to_user("Ok. Thanks.\n\r", usr);
+		send_to_user("Wow! What a great idea! Thanks!!\n\r", usr);
 		return;
 	}
 }
@@ -773,7 +762,7 @@ void do_admin(USER_DATA *usr, char *argument) {
 
 	for (musr = user_list; musr != NULL; musr = musr->next) {
 		if (IS_ADMIN(musr) && IS_TOGGLE(musr, TOGGLE_ADM)) {
-			sprintf(buf, "#x[#GAdmin Channel#x][#G%s#x] %s#x\n\r", usr->name,
+			sprintf(buf, "#x[#RAdmin#x][#G%s#x] %s#x\n\r", usr->name,
 					argument);
 			if (isBusySelf(musr))
 				add_buffer(musr, buf);
@@ -873,7 +862,7 @@ void do_feeling_org(USER_DATA *usr, char *argument, bool fXing) {
 				x_usr->name);
 		send_to_user(buf, usr);
 		if (str_cmp(x_usr->idlemsg, "NONE")) {
-			send_to_user_bw(x_usr->idlemsg, usr);
+			send_to_user_c(x_usr->idlemsg, usr, FALSE);
 			send_to_user("\n\r", usr);
 		}
 		usr->xing_to = "*NONE*";
@@ -893,27 +882,40 @@ void do_feeling_org(USER_DATA *usr, char *argument, bool fXing) {
 		return;
 	}
 
-	if (!IS_TOGGLE(x_usr, TOGGLE_FEEL) && is_friend(x_usr, usr->name))
+	if (!IS_TOGGLE(x_usr, TOGGLE_FEEL) && is_friend(x_usr, usr->name)) {
 		send_to_user(
 				"User has feeling disabled.  You're in the user's friend list.\n\r",
 				usr);
-	send_to_user("Available feelings are:\n\r", usr);
-	send_to_user("h  - Hug             k  - Kiss            s  - Smile\n\r"
-		"c  - Kick            r  - <undefined>     g  - Grin\n\r"
-		"n  - Nah!            l  - Seni seviyorum  y  - Yalarim\n\r"
-		"b  - Byebye          p  - Poke            t  - <undefined>\n\r"
-		"\n\r"
-		"q  - Exit menu\n\r", usr);
+	}
+
+	FEELING_DATA* pFeel = first_feeling;
+	BUFFER* output = new_buf();
+	sprintf(buf, "\n\r#WAvailable feelings are:#x\n\r\n\r");
+	add_buf(output, buf);
+	int i = 1;
+	for (; pFeel; pFeel = pFeel->next, i++) {
+		sprintf(buf, "#C%7s#W - #M%-10s#x", pFeel->keyword, pFeel->name);
+		if (i % 3 == 0) {
+			strcat(buf, "\n\r");
+		}
+		add_buf(output, buf);
+	}
+	sprintf(buf, "\n\r      #Cq#W - #RExit menu#x\n\r\n\r");
+	add_buf(output, buf);
+	send_to_user(buf_string(output), usr);
+	free_buf(output);
+
 	usr->xing_to = x_usr->name;
 	usr->last_xing = x_usr->name;
 	EDIT_MODE(usr) = EDITOR_FEELING;
 	if (IS_TOGGLE(x_usr, TOGGLE_WARN) && fXing) {
-		sprintf(buf, "%s is about to send a feeling to you.\n\r", colorize(
+		sprintf(buf, "%s is about to send you something nice.\n\r", colorize(
 				x_usr, usr->name));
-		if (isBusySelf(x_usr))
+		if (isBusySelf(x_usr)) {
 			add_buffer(x_usr, buf);
-		else
+		} else {
 			send_to_user(buf, x_usr);
+		}
 	}
 	return;
 }
@@ -943,211 +945,48 @@ void edit_feeling_receipt(USER_DATA *usr, char *argument) {
 void edit_feeling(USER_DATA *usr, char *argument) {
 	char buf[STRING_LENGTH];
 	USER_DATA *xing;
+	FEELING_DATA* pFeel = first_feeling;
 
-	while (isspace(*argument))
+	while (isspace(*argument)) {
 		argument++;
+	}
 
 	usr->timer = 0;
 
 	strcpy(buf, argument);
 
-	switch (UPPER(buf[0])) {
-		case 'H':
-			send_feeling(usr, FEELING_HUG);
-			return;
-
-		case 'K':
-			send_feeling(usr, FEELING_KISS);
-			return;
-
-		case 'S':
-			send_feeling(usr, FEELING_SMILE);
-			return;
-
-		case 'C':
-			send_feeling(usr, FEELING_KICK);
-			return;
-
-		case 'G':
-			send_feeling(usr, FEELING_GRIN);
-			return;
-
-		case 'N':
-			send_feeling(usr, FEELING_NAH);
-			return;
-
-		case 'L':
-			send_feeling(usr, FEELING_SSEV);
-			return;
-
-		case 'Y':
-			send_feeling(usr, FEELING_YALARIM);
-			return;
-
-		case 'B':
-			send_feeling(usr, FEELING_BYEBYE);
-			return;
-
-		case 'P':
-			send_feeling(usr, FEELING_POKE);
-			return;
-
-		case 'Q':
-		case '\0': {
-			send_to_user("Aborted.\n\r", usr);
-			xing = get_user(usr->xing_to);
-			usr->xing_to = "*NONE*";
-			EDIT_MODE(usr) = EDITOR_NONE;
-			if (xing && IS_TOGGLE(xing, TOGGLE_WARN)) {
-				sprintf(buf, "%s has cancelled sending feeling to you.\n\r",
-						colorize(xing, usr->name));
-				if (isBusySelf(xing))
-					add_buffer(xing, buf);
-				else
-					send_to_user(buf, xing);
+	if (UPPER(buf[0]) == 'Q' || buf[0] == '\0') {
+		send_to_user("Aborted.\n\r", usr);
+		xing = get_user(usr->xing_to);
+		usr->xing_to = "*NONE*";
+		EDIT_MODE(usr) = EDITOR_NONE;
+		if (xing && IS_TOGGLE(xing, TOGGLE_WARN)) {
+			sprintf(buf, "%s has cancelled sending something nice to you.\n\r", colorize(xing, usr->name));
+			if (isBusySelf(xing)) {
+				add_buffer(xing, buf);
+			} else {
+				send_to_user(buf, xing);
 			}
-			return;
 		}
+		return;
+	}
 
-		default: {
-			send_to_user("We don't have a feeling for that. Sorry...\n\r\n\r",
-					usr);
-			EDIT_MODE(usr) = EDITOR_NONE;
-			do_feeling_org(usr, usr->last_xing, FALSE);
+	for (; pFeel; pFeel = pFeel->next) {
+		if (!str_prefix(buf, pFeel->keyword)) {
+			send_feeling(usr, pFeel->text);
 			return;
 		}
 	}
+
+	send_to_user("We don't have a feeling for that. Sorry...\n\r\n\r", usr);
+	EDIT_MODE(usr) = EDITOR_NONE;
+	do_feeling_org(usr, usr->last_xing, FALSE);
+	return;
 }
 
-void send_feeling(USER_DATA *usr, int type) {
+void send_feeling(USER_DATA *usr, const char* feeling) {
 	char output[STRING_LENGTH];
 	USER_DATA *xing;
-	char *feeling;
-
-	switch (type) {
-		case FEELING_HUG:
-			feeling
-					= "#W..............#g#####W.....#g#####W.#g#####W.....#g####"
-						"#W..#g#############W................\n\r"
-						"#W..#g#####W...#g#####W.....#g#####W.....#g#####W.#g#####W....."
-						"#g#####W.#g#####W....#g#####W......#g#####W...#g#####W..\n\r"
-						"#W...#g#####W.#g#####W......#g#####W.....#g#####W.#g#####W....."
-						"#g#####W.#g#####W.............#g#####W.#g#####W...\n\r"
-						"#W.#g###################W....#g###################W."
-						"#g#####W.....#g#####W.#g#####W...#g#########W....#g###################W.\n\r"
-						"#W...#g#####W.#g#####W......#g#####W.....#g#####W.#g#####W....."
-						"#g#####W.#g#####W....#g#####W.......#g#####W.#g#####W...\n\r"
-						"#W..#g#####W...#g#####W.....#g#####W.....#g#####W.#g#####W....."
-						"#g#####W.#g#####W....#g#####W......#g#####W...#g#####W..\n\r"
-						"#W..............#g#####W.....#g#####W..#g##############"
-						"#W...#g#############W................#x";
-			break;
-
-		case FEELING_KISS:
-			feeling
-					= "#W####    #### ########  ############   ############\n\r"
-						"#W####   ####   ####  ####    #### ####    ####\n\r"
-						"#W####  ####    ####  ####       ####"
-						"                   #y,-------.\n\r"
-						"#W##########     ####   ############   "
-						"#W############        #y...   | #MMuck!#y |\n\r"
-						"#W####  ####    ####        ####       ####"
-						"      #x(#Do o#x)#y__)-------'\n\r"
-						"#W####   ####   ####  ####    #### ####    "
-						"#W#### #y-#xooO#y--#x(_)#y--#xOoo#y------\n\r"
-						"#W####    #### ########  ############   #############x";
-			break;
-
-		case FEELING_SMILE:
-			feeling
-					= "#c .::::::.   .        :     :::   :::       .,::::::\n\r"
-						";;;`    `   ;;,.    ;;;    ;;;   ;;;       ;;;;''''\n\r"
-						"'[==/[[[[,  [[[[, ,[[[[,   [[[   [[[        [[cccc\n\r"
-						"  '''    $  $$$$$$$$\"$$$   $$$   $$'        $$\"\"\"\"\n\r"
-						" 88b    dP  888 Y88\" 888o  888  o88oo,.__   888oo,__\n\r"
-						"  \"YMmMY\"   MMM  M'  \"MMM  MMM  \"\"\"\"YUMMM   \"\"\"\"YUMMM#x";
-			break;
-
-		case FEELING_KICK:
-			feeling = "              #W _  __  ___    ____   _  __  _\n\r"
-				"     #R!!!      #W| |/ / |_ _|  / ___| | |/ / | |      #R!!!\n\r"
-				"  #R`  #y_ _  #R'   #W| ' /   | |  | |"
-				"     | ' /  | |   #R`  #y_ _  #R'\n\r"
-				" #R-  #x(#RO#xX#RO#x)  #R-  #W| . \\   | |  |"
-				" |___  | . \\  |_|  #R-  #x(#RO#xX#RO#x)  #R-\n\r"
-				"#xooO#W--#x(_)#W--#xOoo#W-|_|\\_\\ |___|"
-				"  \\____| |_|\\_\\ (_)-#xooO#W--#x(_)#W--#xOoo#x";
-			break;
-
-		case FEELING_GRIN:
-			feeling = "#R @@@@@@@  @@@@@@@  @@@ @@@  @@@\n\r"
-				"#r!#R@@       @@#r!  #R@@@ @@#r! #R@@#r!#R@#r!#R@@@\n\r"
-				"#r!#R@#r! #R@#r!#R@#r!#R@ @#r!#R@#r!!#R@#r!  !!#R@ @#r!#R@@#r!!#R@#r!\n\r"
-				"#r:!!   !!: !!: :!!  !!: !!:  !!!\n\r"
-				"#r :: :: :   :   : : :   ::    :#x";
-			break;
-
-		case FEELING_NAH:
-			feeling = "#W####    ####    ######    ####     #### ######\n\r"
-				"######   ####   #### ####   ####     #### ######\n\r"
-				"########  ####  ####   ####  ####     #### ######\n\r"
-				"#### #### #### ####     #### ##################  ##\n\r"
-				"####  ######## ################## ####     ####\n\r"
-				"####   ###### ####     #### ####     #### ######\n\r"
-				"####    #### ####     #### ####     #### #######x";
-			break;
-
-		case FEELING_SSEV:
-			feeling = "#W ____             _   ____             _\n\r"
-				"/ ___|  ___ _ __ (_) / ___|  _____   _(_)_"
-				"   _  ___  _ __ _   _ _ __ ___\n\r"
-				"\\___ \\ / _ \\ '_ \\| | \\___ \\ / _ \\ \\"
-				" / / | | | |/ _ \\| '__| | | | '_ ` _ \\\n\r"
-				" ___) |  __/ | | | |  ___) |  __/\\ V /| | |_|"
-				" | (_) | |  | |_| | | | | | |\n\r"
-				"|____/ \\___|_| |_|_| |____/ \\___| \\_/ |_|\\__,"
-				" |\\___/|_|   \\__,_|_| |_| |_|\n\r"
-				"                                         |___/#x";
-			break;
-
-		case FEELING_YALARIM:
-			feeling = "#W                  888\n\r                  888\n\r"
-				"888  888  8888b.  888  8888b.  888d888 888"
-				" 88888b.d88b.\n\r"
-				"888  888     \"88b 888     \"88b 888P\"   "
-				"888 888 \"888 \"88b   \\|/ ____ \\|/\n\r"
-				"888  888 .d888888 888 .d888888 888     888 "
-				"888  888  888    @~/ ,. \\~@\n\r"
-				"Y88b 888 888  888 888 888  888 888     888 "
-				"888  888  888   /_( \\__/ )_\\\n\r"
-				" \"Y88888 \"Y888888 888 \"Y888888 888     "
-				"888 888  888  888      \\__U_/\n\r"
-				"     888\n\rY8b d88P\n\r \"Y88P\"#x";
-			break;
-
-		case FEELING_BYEBYE:
-			feeling
-					= "#W.______   ____    ____  _______ .______   ____    ____  _______\n\r"
-						"|   _  \\  \\   \\  /   / |   ____||   _  \\  \\   \\  /   / |   ____|\n\r"
-						"|  |_)  |  \\   \\/   /  |  |__   |  |_)  |  \\   \\/   /  |  |__\n\r"
-						"|   _  <    \\_    _/   |   __|  |   _  <    \\_    _/   |   __|\n\r"
-						"|  |_)  |     |  |     |  |____ |  |_)  |     |  |     |  |____\n\r"
-						"|______/      |__|     |_______||______/      |__|     |_______|#x";
-			break;
-
-		case FEELING_POKE:
-			feeling
-					= "#Woooooooooo     ooooooo    oooo   oooo  ooooooooooo\n\r"
-						" 888    888  o888   888o   888  o88     888    88\n\r"
-						" 888oooo88   888     888   888888       888ooo8\n\r"
-						" 888         888o   o888   888  88o     888    oo\n\r"
-						"o888o          88ooo88    o888o o888o  o888ooo8888#x";
-			break;
-
-		default:
-			feeling = "no such feeling";
-			break;
-	}
 
 	if ((xing = get_user(usr->xing_to)) == NULL) {
 		send_to_user(
@@ -1194,7 +1033,7 @@ void send_feeling(USER_DATA *usr, int type) {
 				usr->xing_to);
 		send_to_user(output, usr);
 		if (str_cmp(xing->idlemsg, "NONE")) {
-			send_to_user_bw(xing->idlemsg, usr);
+			send_to_user_c(xing->idlemsg, usr, FALSE);
 			send_to_user("\n\r", usr);
 		}
 		usr->xing_to = "*NONE*";
@@ -1266,6 +1105,12 @@ void send_feeling(USER_DATA *usr, int type) {
 }
 
 void do_feeling(USER_DATA *usr, char *argument) {
+	if (!first_feeling) {
+		bbs_bug("do_feeling: NULL first_feeling!");
+		send_to_user("\n\r#RUh oh, seems like feelings were not loaded yet.#x\n\r\n\r", usr);
+		return;
+	}
 	do_feeling_org(usr, argument, TRUE);
 }
+
 

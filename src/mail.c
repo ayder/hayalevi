@@ -274,6 +274,7 @@ MAIL_DATA *read_mail(FILE *fpMail) {
 	ungetc(letter, fpMail);
 
 	pMail = (MAIL_DATA *) alloc_mem(sizeof(MAIL_DATA));
+	pMail->marked = FALSE;
 
 	for (;;) {
 		word = feof(fpMail) ? "End" : fread_word(fpMail);
@@ -366,12 +367,12 @@ void save_mail(USER_DATA *usr) {
 	char buf[INPUT];
 
 	sprintf(buf, "%s%s", MAIL_DIR, capitalize(usr->name));
-	fclose(fpReserve);
+	//fclose(fpReserve);
 
 	if (!(fpMail = fopen(buf, "w"))) {
 		send_to_user("ERROR: Could not open to write your mail file.\n\r", usr);
 		bbs_bug("Save_mail: Could not open to write %s", buf);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		return;
 	}
 
@@ -380,7 +381,7 @@ void save_mail(USER_DATA *usr) {
 			append_mail(pMail, fpMail);
 
 	fclose(fpMail);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	return;
 }
 
@@ -465,14 +466,14 @@ void edit_mail_send(USER_DATA *usr) {
 	}
 
 	sprintf(buf, "%s%s", MAIL_DIR, capitalize(usr->pCurrentMail->to));
-	fclose(fpReserve);
+	//fclose(fpReserve);
 
 	if (!(fpMail = fopen(buf, "a"))) {
 		print_to_user(usr,
 				"ERROR: Could not open to write %s's mail file.\n\r",
 				capitalize(usr->pCurrentMail->to));
 		bbs_bug("Save_mail: Could not open to write %s", buf);
-		fpReserve = fopen(NULL_FILE, "r");
+		//fpReserve = fopen(NULL_FILE, "r");
 		/*	edit_mail_free(usr); BAXTER */
 		usr->pCurrentMail = NULL;
 		return;
@@ -480,7 +481,7 @@ void edit_mail_send(USER_DATA *usr) {
 
 	append_mail(usr->pCurrentMail, fpMail);
 	fclose(fpMail);
-	fpReserve = fopen(NULL_FILE, "r");
+	//fpReserve = fopen(NULL_FILE, "r");
 	/*    edit_mail_free(usr); */
 	usr->pCurrentMail = NULL;
 	return;
