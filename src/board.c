@@ -55,34 +55,7 @@ void do_quit_org(USER_DATA * usr, char *argument, bool fXing);
 
 /** title'i forum adina set edelim */
 void update_title(USER_DATA* usr, BOARD_DATA* pBoard) {
-	// TODO: Add TOGGLE support here.
 	print_to_user(usr, "\033]0;%s - %s [Mod: %s]\007", config.bbs_name, pBoard->long_name, pBoard->moderator);
-}
-
-void notify_forum_users(BOARD_DATA* pBoard, USER_DATA* usr, bool enter) {
-	if (!IS_TOGGLE(usr, TOGGLE_SAY)) {
-		return;
-	}
-	char buf[STRING_LENGTH];
-	USER_DATA* musr;
-	for (musr = user_list; musr != NULL; musr = musr->next) {
-		if (!str_cmp(usr->name, musr->name)) {
-			continue;
-		}
-		if (str_cmp(pBoard->short_name, musr->pBoard->short_name)) {
-			continue;
-		}
-		if (!IS_TOGGLE(musr, TOGGLE_SAY) || IS_TOGGLE(musr, TOGGLE_IDLE)) {
-			continue;
-		}
-		sprintf(buf, "[#Y%s#x] %s #B%s the forum.#x\n\r", pBoard->long_name,
-			colorize(musr, usr->name), enter ? "entered" : "left");
-		if (isBusySelf(musr)) {
-			add_buffer(musr, buf);
-		} else {
-			send_to_user(buf, musr);
-		}
-	}
 }
 
 /*
@@ -1156,9 +1129,7 @@ void do_jump(USER_DATA * usr, char *argument) {
 
 		sprintf(buf, "You are in the %s now.\r\n", pBoard->short_name);
 		send_to_user(buf, usr);
-		notify_forum_users(usr->pBoard, usr, FALSE);
 		usr->pBoard = pBoard;
-		notify_forum_users(usr->pBoard, usr, TRUE);
 		return;
 	}
 
@@ -1167,7 +1138,8 @@ void do_jump(USER_DATA * usr, char *argument) {
 		send_to_user("You left the chat room.\r\n", usr);
 	}
 
-	print_to_user(usr, "You are in the #G%s#w forum.\r\n", pBoard->long_name);
+	print_to_user(usr, "You are in the #G%s#w forum.\r\n",
+			pBoard->long_name);
 	if (!IS_TOGGLE(usr, TOGGLE_HELP)) {
 		send_to_user("You can set up new notes with the command 'note <subject>'."
 			"\r\n" "Read a note with 'read num'. You can clip a note to your"
@@ -1190,9 +1162,7 @@ void do_jump(USER_DATA * usr, char *argument) {
 		sprintf(buf, "NO NEW MESSAGES.\r\n");
 
 	send_to_user(buf, usr);
-	notify_forum_users(usr->pBoard, usr, FALSE);
 	usr->pBoard = pBoard;
-	notify_forum_users(usr->pBoard, usr, TRUE);
 	if (!pBoard->last_note) {
 		usr->current_note = NULL;
 		return;
@@ -1862,11 +1832,6 @@ void do_readinterval(USER_DATA * usr, char *argument) {
 		send_to_user("No such message.\r\n", usr);
 		return;
 	}
-
-	if (anum2 - anum > 10) {
-		send_to_user("Sorry, maximum interval (for now) is 10.\r\n", usr);
-		return;
-	}
 	
 	for (pNote = pBoard->first_note; pNote; pNote = pNote->next) {
 		if ((++vnum == anum && !fNumber) || (fNumber && anum == pNote->vnum)) {
@@ -2128,9 +2093,7 @@ void do_skip(USER_DATA* usr, char* argument) {
 			sprintf(buf, "\r\nOkay; I have some new notes for you in "
 				"#C%s#x.\r\r\n\n", pBoard->long_name);
 			send_to_user(buf, usr);
-			notify_forum_users(usr->pBoard, usr, FALSE);
 			usr->pBoard = pBoard;
-			notify_forum_users(usr->pBoard, usr, TRUE);
 			update_title(usr, pBoard);
 			return;
 		}
@@ -2224,9 +2187,7 @@ void do_new(USER_DATA *usr, char *argument) {
 					", jumping to #C%s#x\r\r\n\n", usr->pBoard->long_name,
 						pBoard->long_name);
 				send_to_user(buf, usr);
-				notify_forum_users(usr->pBoard, usr, FALSE);
 				usr->pBoard = pBoard;
-				notify_forum_users(usr->pBoard, usr, TRUE);
 				update_title(usr, pBoard);
 				return;
 			}

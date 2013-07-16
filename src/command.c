@@ -127,7 +127,8 @@ const struct cmd_type cmd_table [] = { //
 				{ "dict", do_dict, 0, 1, 1 }, //
 				{ "exchange", do_disp_exchange, 0, 1, 1 }, //
 				{ "charset", do_charset, 0, 1, 1 }, //
-				{ "fc", do_say, 0, 1, 1 }, //
+				
+
 				/*
 				 * Moderator commands.
 				 */
@@ -856,7 +857,6 @@ void do_toggle(USER_DATA *usr, char *argument) {
 				"#CFeeling         #C: %s\r\n"
 				"#CMore #cmesaji     #C: %s\r\n"
 				"#cAuto#Cjump        #C: %s\r\n" 
-				"#cSohbet        #C: %s\r\n" 
 				"#cYardim        #C: %s\r\n", 
 			IS_TOGGLE(usr, TOGGLE_XING) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_BEEP) ? "#WAcik" : "#RKapali", 
@@ -867,7 +867,6 @@ void do_toggle(USER_DATA *usr, char *argument) {
 			IS_TOGGLE(usr, TOGGLE_FEEL) ? "#WAcik" : "#RKapali", 
 			!IS_TOGGLE(usr, TOGGLE_MORE) ? "#WAcik" : "#RKapali", 
 			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WAcik" : "#RKapali",
-			IS_TOGGLE(usr, TOGGLE_SAY) ? "#WAcik" : "#RKapali",
 			IS_TOGGLE(usr, TOGGLE_HELP) ? "#WAcik" : "#RKapali");
 		else
 			sprintf(buf, "#cMessage e#CX#cpress #C: %s\r\n"
@@ -879,7 +878,6 @@ void do_toggle(USER_DATA *usr, char *argument) {
 				"#CFeeling         #C: %s\r\n"
 				"#CMore #cmessage    #C: %s\r\n"
 				"#cAuto#Cjump        #C: %s\r\n" 
-				"#cForum #CChat      #C: %s\r\n" 
 				"#CHelp            #C: %s\r\n", 
 			IS_TOGGLE(usr, TOGGLE_XING) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_BEEP) ? "#WOn" : "#ROff", 
@@ -890,7 +888,6 @@ void do_toggle(USER_DATA *usr, char *argument) {
 			IS_TOGGLE(usr, TOGGLE_FEEL) ? "#WOn" : "#ROff", 
 			!IS_TOGGLE(usr, TOGGLE_MORE) ? "#WOn" : "#ROff", 
 			IS_TOGGLE(usr, TOGGLE_AUTOJUMP) ? "#WOn" : "#ROff",
-			IS_TOGGLE(usr, TOGGLE_SAY) ? "#WOn" : "#ROff",
 			IS_TOGGLE(usr, TOGGLE_HELP) ? "#WOn" : "#ROff");
 		send_to_user(buf, usr);
 		if (IS_ADMIN(usr)) {
@@ -1057,15 +1054,6 @@ void do_toggle(USER_DATA *usr, char *argument) {
 		} else {
 			send_to_user("You toggle admin channel On.\r\n", usr);
 			SET_TOGGLE(usr, TOGGLE_ADM);
-		}
-		return;
-	} else if (!str_cmp(arg, "chat") ) {
-		if (IS_TOGGLE(usr, TOGGLE_SAY)) {
-			send_to_user("You toggle forum chat Off.\r\n", usr);
-			REM_TOGGLE(usr, TOGGLE_SAY);
-		} else {
-			send_to_user("You toggle forum chat On.\r\n", usr);
-			SET_TOGGLE(usr, TOGGLE_SAY);
 		}
 		return;
 	} else {
@@ -1482,56 +1470,4 @@ void do_uptime(USER_DATA *usr, char *argument) {
 				get_age(uptime, FALSE));
 	send_to_user(buf, usr);
 	return;
-} 
-
-void do_say(USER_DATA * usr, char *argument)
-{
-    char buf[STRING];
-    DESC_DATA *d;
-
-    if (!usr)
-	return;
-
-    if (!usr->pBoard)
-	return;
-
-    if (argument[0] == '\0') {
-	syntax("say [message]", usr);
-	return;
-    }
-
-    if (!IS_TOGGLE(usr, TOGGLE_SAY)) { 
-	syntax ("You did not toggle chat yet",usr);
-	return;
-    }
-    if (IS_TOGGLE(usr, TOGGLE_IDLE)) {
-	syntax("You are idle. Idle people should not chat!", usr);
-	return;
-    }
-
-    sprintf(buf, "[#Y%s#x][#C%s#x] %s#x\r\n", usr->pBoard->long_name, usr->name, argument);
-
-    for (d = desc_list; d; d = d->next) {
-	if (USR(d) && d->login == CON_LOGIN && USR(d)->Validated) {
-	    if (USR(d)->pBoard != usr->pBoard) {
-		continue;
-	    }
-            if (!IS_TOGGLE(USR(d), TOGGLE_SAY) || IS_TOGGLE(USR(d), TOGGLE_IDLE)  ) {
-		continue;
-	    }
-	    if (is_ignore(USR(d), usr->name, TRUE)) {
-		continue;
-	    }
-            if (is_ignore(usr, USR(d)->name, TRUE)) {
-                continue;
-            }
-
-	    if (isBusySelf(USR(d)))
-		add_buffer(USR(d), buf);
-	    else
-		send_to_user(buf, USR(d));
-	}
-    }
-
-    return;
 }

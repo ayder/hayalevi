@@ -134,7 +134,6 @@ typedef void DO_FUN(USER_DATA *usr, char *argument);
 #define K			(1 << 10)
 #define L			(1 << 11)
 #define M			(1 << 12)
-#define N			(1 << 13)
 
 
 /*
@@ -183,7 +182,6 @@ typedef void DO_FUN(USER_DATA *usr, char *argument);
 #define TOGGLE_AUTOJUMP	(K)
 #define TOGGLE_HELP	(L)
 #define TOGGLE_MORE	(M)
-#define TOGGLE_SAY	(N)
 
 #define BBS_NEWLOCK		(A)
 #define BBS_ADMLOCK		(B)
@@ -902,7 +900,8 @@ CMD_DO_FUN( do_showmods );
 CMD_DO_FUN( do_statforum);
 CMD_DO_FUN( do_loadfeeling);
 CMD_DO_FUN( do_loadhelp);
-CMD_DO_FUN( do_say);
+
+
 
 #define BOARD_NORMAL		1
 #define BOARD_ADMIN			2

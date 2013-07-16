@@ -724,7 +724,7 @@ void do_bug(USER_DATA *usr, char *argument) {
 		fprintf(fpBug, "[%-12s] [%s]: %s\n", usr->name, usr->xing_time,
 				argument);
 		fclose(fpBug);
-		send_to_user("Darn!.. Really?.. Sorry about that.. But, we'll fix that in a jiffy. :)\n\r", usr);
+		send_to_user("Ok. Thanks.\n\r", usr);
 		return;
 	}
 }
@@ -746,7 +746,7 @@ void do_idea(USER_DATA *usr, char *argument) {
 		fprintf(fpIdea, "[%-12s] [%s]: %s\n", usr->name, usr->xing_time,
 				argument);
 		fclose(fpIdea);
-		send_to_user("Wow! What a great idea! Thanks!!\n\r", usr);
+		send_to_user("Ok. Thanks.\n\r", usr);
 		return;
 	}
 }
@@ -762,7 +762,7 @@ void do_admin(USER_DATA *usr, char *argument) {
 
 	for (musr = user_list; musr != NULL; musr = musr->next) {
 		if (IS_ADMIN(musr) && IS_TOGGLE(musr, TOGGLE_ADM)) {
-			sprintf(buf, "#x[#RAdmin#x][#G%s#x] %s#x\n\r", usr->name,
+			sprintf(buf, "#x[#GAdmin Channel#x][#G%s#x] %s#x\n\r", usr->name,
 					argument);
 			if (isBusySelf(musr))
 				add_buffer(musr, buf);

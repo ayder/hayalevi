@@ -274,7 +274,6 @@ MAIL_DATA *read_mail(FILE *fpMail) {
 	ungetc(letter, fpMail);
 
 	pMail = (MAIL_DATA *) alloc_mem(sizeof(MAIL_DATA));
-	pMail->marked = FALSE;
 
 	for (;;) {
 		word = feof(fpMail) ? "End" : fread_word(fpMail);
